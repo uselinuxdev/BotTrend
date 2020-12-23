@@ -1369,8 +1369,8 @@ short goFrancisca()
          Dprice=cPos.PriceCurrent();
          if(TYPE_POS==POSITION_TYPE_SELL)
          {
-            DnewTP=NormalizeDouble(Dprice-(iFrancisca*3.5*pips),Digits());
-            DnewSL=dOpen-((TakeProfit+(iFrancisca*2))*pips);
+            DnewTP=NormalizeDouble(Dprice-(iFrancisca*2*pips),Digits());
+            DnewSL=dOpen-((TakeProfit+(iFrancisca))*pips);
             // Mision cumplida. Nueva misión
             if(dOldSL>0 && dOldSL<DnewSL)
             {
@@ -1387,8 +1387,8 @@ short goFrancisca()
          }
          else
          {
-            DnewTP=NormalizeDouble((Dprice+(iFrancisca*3.5*pips)),Digits());
-            DnewSL=dOpen+((TakeProfit+(iFrancisca*2))*pips);
+            DnewTP=NormalizeDouble((Dprice+(iFrancisca*2*pips)),Digits());
+            DnewSL=dOpen+((TakeProfit+(iFrancisca))*pips);
             if(dOldSL>DnewSL)
             {
                /////DnewSL=NormalizeDouble(cPos.StopLoss()+((TakeProfit/2)*pips),Digits());
@@ -1715,11 +1715,11 @@ short SetSLMax()
          if(dOpen>dSL && dSL>0) continue;
          // Reset DSL
          dSL=0;        
-         dCheck=NormalizeDouble(dOpen-(TakeProfit*3.5*pips),Digits());
+         dCheck=NormalizeDouble(dOpen-(TakeProfit*2*pips),Digits());
          ///if(dPriceNow<dCheck && cPos.Volume()<dMaxLotSL) 
          if(dPriceNow<dCheck)
          {
-            dSL=NormalizeDouble(dOpen-((iFrancisca*2)*pips),Digits());
+            dSL=NormalizeDouble(dOpen-((iFrancisca)*pips),Digits());
 
          }
       }
@@ -1729,11 +1729,11 @@ short SetSLMax()
          if(dOpen<dSL) continue;
          // Reset DSL
          dSL=0;
-         dCheck=NormalizeDouble(dOpen+(TakeProfit*3.5*pips),Digits());
+         dCheck=NormalizeDouble(dOpen+(TakeProfit*2*pips),Digits());
          //if(dPriceNow>dCheck && cPos.Volume()<dMaxLotSL)
          if(dPriceNow>dCheck)
          {
-            dSL=NormalizeDouble(dOpen+((iFrancisca*2)*pips),Digits());
+            dSL=NormalizeDouble(dOpen+((iFrancisca)*pips),Digits());
 
          } 
       }
