@@ -100,7 +100,7 @@ input int      piNumBars=3;
 input int      iMaxThead=1;
 input bool     bSoftFriday=true;
 input bool     bHollidays=true;
-input ulong    lMaxHighTrend=6;
+input ulong    lMaxHighTrend=2;
 input ENUM_CENT ENUMCENT=CENT_1;
 
 // Dont open when the market will be to close. Or opened 1h.
