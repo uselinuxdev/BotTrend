@@ -1374,7 +1374,6 @@ short goFrancisca()
             // Mision cumplida. Nueva misión
             if(dOldSL>0 && dOldSL<DnewSL)
             {
-               /////DnewSL=NormalizeDouble(cPos.StopLoss()-((TakeProfit/2)*pips),Digits());
                DnewSL=NormalizeDouble((dOldSL-(iFrancisca*pips)),Digits());
             }
             else
@@ -1715,7 +1714,7 @@ short SetSLMax()
          if(dOpen>dSL && dSL>0) continue;
          // Reset DSL
          dSL=0;        
-         dCheck=NormalizeDouble(dOpen-(TakeProfit*5*pips),Digits());
+         dCheck=NormalizeDouble(dOpen-(TakeProfit*4.5*pips),Digits());
          ///if(dPriceNow<dCheck && cPos.Volume()<dMaxLotSL) 
          if(dPriceNow<dCheck)
          {
@@ -1729,11 +1728,11 @@ short SetSLMax()
          if(dOpen<dSL) continue;
          // Reset DSL
          dSL=0;
-         dCheck=NormalizeDouble(dOpen+(TakeProfit*5*pips),Digits());
+         dCheck=NormalizeDouble(dOpen+(TakeProfit*4.5*pips),Digits());
          //if(dPriceNow>dCheck && cPos.Volume()<dMaxLotSL)
          if(dPriceNow>dCheck)
          {
-            dSL=NormalizeDouble(dOpen+((iFrancisca*1)*pips),Digits());
+            dSL=NormalizeDouble(dOpen+((iFrancisca)*pips),Digits());
 
          } 
       }
