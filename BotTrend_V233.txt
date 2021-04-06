@@ -289,9 +289,9 @@ void LoadLicenceAccount()
    MQDATELOGIN[4].mon=05;
    MQDATELOGIN[4].year=2021;
    // Juan (Carlos Norte)
-   ALOGINSILVER[5]=1139912;
-   MQDATELOGIN[5].day=08;
-   MQDATELOGIN[5].mon=05;
+   ALOGINSILVER[5]=7803938;
+   MQDATELOGIN[5].day=03;
+   MQDATELOGIN[5].mon=07;
    MQDATELOGIN[5].year=2021;         
 }
 short CheckLicence()
@@ -1860,4 +1860,3 @@ int CheckEdges(ENUM_POSITION_TYPE TYPE_POS)
    // Bien
    return 1;
 }
-
