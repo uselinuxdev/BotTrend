@@ -1,0 +1,2340 @@
+//+------------------------------------------------------------------+
+//|                                                     BotTrend.mq5 |
+//|                                    Copyright 2019, Usefilm Corp. |
+//|                                             https://www.mql5.com |
+//+------------------------------------------------------------------+
+#property copyright "Copyright 2020, Usefilm Corp."
+#property link      "https://www.mql5.com"
+#define VERSION "4.12"
+#property version VERSION
+
+// Inclusión de objetos de liberia estandar
+#include<Trade\Trade.mqh>
+#include <Trade\SymbolInfo.mqh>
+#include <Trade\PositionInfo.mqh>
+#include <Trade\AccountInfo.mqh>
+#include "PanelBotTrend.mqh"
+CTrade cTrade;
+CSymbolInfo SymbolInfo;
+CPositionInfo cPos;
+CAccountInfo Cacc;
+CAppDialog AppPanel;
+
+//--- input parameters
+enum ENUM_FRANCISCA
+{
+   SIN_FRANCISCA,
+   FRANCISCA_10,
+   FRANCISCA_20
+};
+
+enum ENUM_BOTMODE
+{
+   WORKING_DAY,
+   SOFT_FRIDAY,
+   SUMMER_TIME,
+   CHRISTMAS,
+   LATERAL_MODE
+};
+
+enum ENUM_THREAD
+{
+   MAXPARM,
+   ISFRIDAY,
+   FOUNDS
+};
+
+enum ENUM_LICENCE
+{
+   GOLD,
+   SILVER
+};
+
+enum ENUM_CENT
+{
+   CENT_1,
+   CENT_10,
+   CENT_20,
+   CENT_50,
+   CENT_100
+};
+
+
+enum ENUM_LATERAL
+{
+   SIN_LATERAL,
+   STEP_2,
+   STEP_3,
+   STEP_4
+};
+
+enum ENUM_OPENMARKET
+{
+   DISABLED,
+   OPEN_AS,
+   OPEN_EUR,
+   OPEN_US,
+   OPEN_EUR_US
+};
+
+// CONTROL POR TIEMPO
+datetime timeCurent;
+datetime timeCheck;
+
+//--- Global vars
+//+------------------------------------------------------------------+
+//| Expert MAGIC number                                              |
+//+------------------------------------------------------------------+
+#define MAGICTREND 13330
+string BOTNAME="TRENDBOT "+VERSION;
+long ATRENDBOT[];
+ulong ATREND[9][99];
+// Cerrar hilo en ganancias dejar op mayor.
+double AMAXBULL[9];
+double dLOTBULL[9];
+double AminBear[9];
+double dLOTBear[9];
+double dMaxBull;
+double dMinBear;
+double ATRENDPROFIT[9];
+// Salvar el step de todos los hilos
+string ACOMMENT[9];
+MqlRates rLastBars[],rCurrent[];
+string vtext;
+enum ENUM_TIPOTEXT{MSGBOX,ALERT,COMMENT,PRINT};
+ENUM_TIPOTEXT ENUMTXT;
+// FRANCICA
+input ENUM_FRANCISCA enumfrancisca=FRANCISCA_10;
+ENUM_BOTMODE enumbotmode=WORKING_DAY;
+ENUM_THREAD enumthread=MAXPARM;
+ENUM_LICENCE enumlicence=GOLD;
+double pips;
+int iFrancisca=10;
+int iCent=1;
+input ENUM_OPENMARKET enumopenmarket=OPEN_EUR_US;
+input ENUM_TIMEFRAMES botperiod=PERIOD_M5;
+input int      iMaxSpread=5;
+input double   TakeProfit=60;
+// input double   dComisionLot= 2.75; // IC MARKETS
+input double   dComisionLot=1;
+int iComisionPips=0;
+input int      iExitProfitStep=0;
+input int      piNumBars=3;
+input int      iMaxThead=1;
+input double     iHighLotDown=0.50;
+input bool     bSoftFriday=true;
+input bool     bHollidays=true;
+input ENUM_CENT ENUMCENT=CENT_1;
+input ENUM_LATERAL ENUMLATERAL=STEP_3;
+
+// Dont open when the market will be to close. Or opened 1h.
+int iHilos=0;
+double dLotBear=0.0;
+double dLotBULL=0.0;
+double dCommision=0.0;
+double dSwapAll=0.0;
+input short saddhour=3;
+ENUM_ORDER_TYPE ENUMBARDIR;
+double Lots = 0.01;
+/////////////////////////////double dAccountEquity = 0.00;
+int    lotdecimal = 2; 
+
+//+------------------------------------------------------------------+
+//| Control de licencias                                             |
+//+------------------------------------------------------------------+
+long ALOGINGOLD[];
+long ALOGINSILVER[];
+MqlDateTime MQDATELOGIN[];
+//+------------------------------------------------------------------+
+//| End control de licencias                                         |
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit()
+  {
+//---
+   // Check point symbol
+   double ticksize=SymbolInfoDouble(Symbol(), SYMBOL_TRADE_TICK_SIZE);
+   pips=ticksize;
+   timeCheck=TimeCurrent()+120;
+   // INIT ARRAY DE PROFIT
+   ArrayInitialize(ATRENDPROFIT,0);
+   // Arrays de max y min values
+   ArrayInitialize(AminBear,0);
+   ArrayInitialize(AMAXBULL,0);
+   // INIT array de contador de STEP
+   countbot(); 
+   // Licence code
+   LoadLicenceAccount();
+   // Primer check de licences
+   if(CheckLicence()==0) return -1;
+   //--- create application dialog. Si falla da igual, continuar
+   if(ExtDialog.Create(0,"BotTrend Panel version: "+VERSION,0,40,40,400,240))
+   {
+      //--- run application
+      ExtDialog.Run();
+   }
+//---
+   return(INIT_SUCCEEDED);
+  }
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+  {
+//---
+   //--- destroy dialog
+   ExtDialog.Destroy(reason);
+  }
+//+------------------------------------------------------------------+
+//| Expert tick function                                             |
+//+------------------------------------------------------------------+
+void OnTick()
+  {
+//---
+   // Check period with input value
+   timeCurent = TimeCurrent();
+   if(Period()!= botperiod)
+   {
+         vtext="El perido es diferente al seleccionado en el robot : "+EnumToString(botperiod)+"!="+EnumToString(Period())+". Robot parado durante 30 segundos.";
+         ENUMTXT = ALERT;
+         expertLog();
+         // Wait 30 second
+         Sleep(30000);
+         return;
+   }
+   // Sólo refrescar 1 vez lo Rates por Tick
+   // Coger últimas barras
+   GetLastBar();
+   // Ajustar cent
+   GetCent();
+   // Contar ops.
+   if(countbot()<0) return;
+   // Every ticks Check Franciscada
+   if(goFrancisca()<0) return;
+   // Igualar SL y TP de todos los hilos
+   // Comprobar cada 1min.
+   if(timeCheck<timeCurent)
+   {
+      timeCheck = TimeCurrent()+60;
+      // SL
+      if(SetSLMax()<0) return;
+      // Check for new steps
+      if(CheckNewStep()<0) return;
+      //HIGHTRENDBOT. Aqui tiene la variable activada enumbotmode=LATERAL_MODE para no abrir
+      AdditionalOpenMarket();
+      // Comprobar BreakEvent
+      if(CheckBreakEvent()<0) return;
+      // Comprobar hilo en beneficios
+      if(CheckAllThreadProfit()<0) return;
+      // Reducción de grandes lotajes
+      if(CheckHighlotDown()<0) return;
+      // Actualiza panel 
+      RefressPanel();
+   }
+   //--- go trading only for first ticks of new bar. Actual bar is the last array element
+   if(rCurrent[0].tick_volume==1)
+   {
+      // Open new positions
+      if(MarketClosing()==0) return;
+      if(BotVacation()==0) return;
+      // Control de apertura 0 para abrir un hightrend si procede
+      if(CheckForOpen()<0) return;
+   }
+  }
+//+------------------------------------------------------------------+
+
+// ------------------------------------------------------------------------------------------------------------------- //
+//                                                BILLING CODE                                                         //
+// ------------------------------------------------------------------------------------------------------------------- //
+void LoadLicenceAccount()
+{
+   ArrayResize(ALOGINGOLD,25);
+   ArrayFill(ALOGINGOLD,0,25,0);
+   // Creator accounts
+   ALOGINGOLD[0]=5141012;
+   ALOGINGOLD[1]=50165336;    /// DEMO ACCOUNT
+   ALOGINGOLD[2]=781805;    /// DEMO ACCOUNT VANTAGE
+   // Client accounts
+   // USE VANTAGE LIVE & DEMO
+   ALOGINGOLD[3]=1129085;
+   ALOGINGOLD[4]=849686; 
+   // Miguel Demo Vantage
+   ALOGINGOLD[5]=781025;
+   // Cuenta DAVID (Sólo robot)
+   ALOGINGOLD[6]=784357;
+   // Gaiton
+   ALOGINGOLD[7]=50489139;
+   // Ivan Antolín
+   ALOGINGOLD[8]=50489767;
+   // Mick G. Johnson
+   ALOGINGOLD[8]=810203;
+   // Use ROBOFOREX
+   ALOGINGOLD[9]=67013738;
+     
+   /////////////////////////////////////////////////////////////////////////////////////////
+   // Silver licences. Posición igual Nº de cuenta y fecha
+   ArrayResize(ALOGINSILVER,25);
+   ArrayFill(ALOGINSILVER,0,25,0);
+   ArrayResize(MQDATELOGIN,25);
+   // Cuenta Carlos (IC Copy a mt4)
+   ALOGINSILVER[0]=50427567; 
+   // Fecha fin Carlos
+   MQDATELOGIN[0].day=12;
+   MQDATELOGIN[0].mon=12;
+   MQDATELOGIN[0].year=2020;
+   // Cuenta Carlos Roboforex
+   ALOGINSILVER[1]=7809183; 
+   // Fecha fin Carlos
+   MQDATELOGIN[1].day=27;
+   MQDATELOGIN[1].mon=2;
+   MQDATELOGIN[1].year=2022;
+   // Ivan Antolin Anual
+   ALOGINSILVER[2]=7804562;
+   // Fecha fin Ivan Inversores
+   MQDATELOGIN[2].day=01;
+   MQDATELOGIN[2].mon=05;
+   MQDATELOGIN[2].year=2022;
+   // Angel Hernangomez
+   ALOGINSILVER[3]=7804521;
+   MQDATELOGIN[3].day=01;
+   MQDATELOGIN[3].mon=5;
+   MQDATELOGIN[3].year=2022;
+   // Mick G. Johnson
+   ALOGINSILVER[4]=1139912;
+   MQDATELOGIN[4].day=08;
+   MQDATELOGIN[4].mon=05;
+   MQDATELOGIN[4].year=2021;
+   // Juan (Carlos Norte)
+   ALOGINSILVER[5]=7803938;
+   MQDATELOGIN[5].day=03;
+   MQDATELOGIN[5].mon=07;
+   MQDATELOGIN[5].year=2021;         
+}
+short CheckLicence()
+{
+   // Get actual account
+   long laccount;
+   laccount=Cacc.Login();
+   // Check Gold licences
+   
+   for(int i=0;i<ArrayRange(ALOGINGOLD,0);i++)
+   {
+      if(ALOGINGOLD[i]==laccount)
+      {
+         vtext="Bot ha encontrado una licencia Gold para la cuenta:"+IntegerToString(laccount)+" - "+Cacc.Name();
+         ENUMTXT = PRINT;
+         expertLog();
+         enumlicence=GOLD;
+         return 1;
+      }
+   }
+   // Buscar licencia por suscripción
+   for(int i=0;i<ArrayRange(ALOGINSILVER,0);i++)
+   {
+      if(ALOGINSILVER[i]==laccount)
+      {
+         vtext="Bot ha encontrado una licencia Silver para la cuenta:"+IntegerToString(laccount)+" - "+Cacc.Name();
+         ENUMTXT = PRINT;
+         expertLog();
+         printf("Licencia válida hasta el %02d/%02d/%4d",MQDATELOGIN[i].day,MQDATELOGIN[i].mon,MQDATELOGIN[i].year,".");
+         enumlicence=SILVER;
+         return 1;
+      }
+   }   
+   vtext="La cuenta "+IntegerToString(laccount)+" no se encuentra licenciada.Último aviso, PAGA LA DROGA!";
+   ENUMTXT = PRINT;
+   expertLog();
+   return 0;
+}
+
+short CheckSilverEnd()
+{
+   long laccount;
+   datetime dNow=TimeCurrent();
+   MqlDateTime strdate;
+   TimeToStruct(dNow,strdate);
+   // Si la licencia no es silver return 1
+   if(enumlicence!=SILVER) return 1;
+      // Get actual account
+   laccount=Cacc.Login();
+   // Buscar licencia por suscripción
+   for(int i=0;i<ArrayRange(ALOGINSILVER,0);i++)
+   {
+      if(ALOGINSILVER[i]==laccount)
+      {
+         // Posición de cuenta en i
+         if(MQDATELOGIN[i].year<=strdate.year && MQDATELOGIN[i].mon<=strdate.mon && MQDATELOGIN[i].day<strdate.day)
+         {
+            vtext="La cuenta "+IntegerToString(laccount)+" ha finalizado su perido de suscripción.Renueve su licencia!!!.";
+            ENUMTXT = PRINT;
+            expertLog();
+            printf("La licencia finalizó el %02d/%02d/%4d",MQDATELOGIN[i].day,MQDATELOGIN[i].mon,MQDATELOGIN[i].year,".");
+            return 0;
+         }
+         // La licencia poner el último día válido
+         if(MQDATELOGIN[i].year==strdate.year && MQDATELOGIN[i].mon==strdate.mon && MQDATELOGIN[i].day+7>strdate.day)
+         {
+            vtext="La cuenta "+IntegerToString(laccount)+" finaliza su suscripción en menos de 7 días.";
+            ENUMTXT = PRINT;
+            expertLog();
+            printf("La licencia finalizará el %02d/%02d/%4d",MQDATELOGIN[i].day,MQDATELOGIN[i].mon,MQDATELOGIN[i].year,".");
+            return 1;
+         }
+         // Licencia encontrada y correcta
+         return 1;
+      }
+   } 
+   // Bien
+   return 0;
+}
+
+// ------------------------------------------------------------------------------------------------------------------- //
+//                                                BILLING CODE END                                                     //
+// ------------------------------------------------------------------------------------------------------------------- //
+
+
+// FUNTION BOT SECTION
+void expertLog()
+{
+   switch(ENUMTXT){
+      case MSGBOX:MessageBox(vtext);break;
+      case ALERT:Alert(vtext);break;
+      case COMMENT:Comment(vtext);break;
+      case PRINT:Print(vtext);break;
+   }
+}  
+void GetLastBar()
+{
+   SymbolInfo.Name(_Symbol);
+   SymbolInfo.Refresh();
+   SymbolInfo.RefreshRates();
+   
+   //int copied=CopyRates(Symbol(),0,1,piNumBars,rLastBars); 
+   int copied=CopyRates(Symbol(),PERIOD_D1,1,1,rLastBars);
+   if(copied<1)
+   {
+      vtext="El copiado de datos historicos de "+_Symbol+" ha fallado, historial no disponible.";
+      ENUMTXT = ALERT;
+      expertLog();
+      return;
+   }
+   CopyRates(Symbol(),0,0,1,rCurrent); 
+}
+// La funcion retorna si el Nº mágico es de los del bot.2 Si es un TBOT
+short IsMyMagic(long lMagicCheck)
+{
+   vtext = "Check Nº magico:"+IntegerToString(lMagicCheck);
+   ENUMTXT = PRINT;
+   //expertLog();
+   if(lMagicCheck >=MAGICTREND && lMagicCheck<=MAGICTREND+9) return 1;
+   // No es de los nuestros
+   return 0;
+}
+
+// Función de actualización de datos del panel
+void RefressPanel()
+{
+  ExtDialog.UpdatePannel(EnumToString(enumbotmode),dLotBULL,dLotBear,iHilos,EnumToString(enumthread),dCommision,dSwapAll,dMaxBull,dMinBear);
+}
+
+
+void checkBardir()
+{
+   // Declarations and rest values.
+   ENUMBARDIR = WRONG_VALUE;
+   ENUMTXT = PRINT;
+   vtext="";
+   //vtext = "Comprobando tendencia de los últimos "+IntegerToString(piNumBars)+" periodos.";
+   //expertLog();
+   // Recorrer las Nvelas desde la posicion anterior a la actual 0
+   // Check tendence: iPopen 0 is the actual bar
+   if(iOpen(NULL,PERIOD_CURRENT,0)< iOpen(NULL,PERIOD_CURRENT,piNumBars))
+   {
+      vtext = "Detectada tendencia BEAR (SELL).Usando tendecia.";
+      ENUMBARDIR = ORDER_TYPE_SELL;
+   }
+   else
+   {
+      vtext = "Detectada tendencia BULL (BUY).Usando tendecia.";
+      ENUMBARDIR = ORDER_TYPE_BUY;
+   }
+  // Print check result
+  expertLog();  
+}
+
+/// Cálculo comisión por lote. De las posición cargada. El importe es negativo
+double getComisionPos()
+{
+   double dComm=0;
+   dComm=NormalizeDouble(cPos.Volume()*(dComisionLot*2),Digits());
+   dComm=dComm*(-1);
+   //Calculo de comisiones en pips
+   iComisionPips=int(dComisionLot*2);
+   return dComm;
+}
+
+
+void GetCent()
+{
+   // CENT MODE
+   //Asignar CentMode
+   switch(ENUMCENT)
+   {
+      case CENT_1:
+         iCent=1;
+         break;
+      case CENT_10:
+         iCent=10;
+         break;
+      case CENT_20:
+         iCent=20;
+         break;
+      case CENT_50:
+         iCent=50;
+         break;
+      case CENT_100:
+         iCent=100;
+         break;
+   }
+}
+// Obtener la media de precios de ayer y de hoy
+ENUM_POSITION_TYPE GetDirDay()
+{
+   MqlRates PriceDataTableDaily[]; 
+   ENUM_POSITION_TYPE TYPE_POS=WRONG_VALUE; 
+   int copied=CopyRates(_Symbol,PERIOD_D1,1,1,PriceDataTableDaily);
+   if(copied<1) return -1;
+   // Control tipo de día
+   if(PriceDataTableDaily[0].open<PriceDataTableDaily[0].close)
+   {
+      // Día Bull
+      TYPE_POS=POSITION_TYPE_BUY;
+      dMaxBull=((PriceDataTableDaily[0].high+PriceDataTableDaily[0].close)/2);
+      dMinBear=((PriceDataTableDaily[0].low+PriceDataTableDaily[0].open)/2);
+   }
+   else
+   {
+      // Día Bear
+      TYPE_POS=POSITION_TYPE_SELL;
+      dMaxBull=((PriceDataTableDaily[0].high+PriceDataTableDaily[0].open)/2);
+      dMinBear=((PriceDataTableDaily[0].low+PriceDataTableDaily[0].close)/2);
+   }
+   return TYPE_POS;
+}
+
+/////////////////////////////////////////////// Contar bots. MAX 9 hilos
+short countbot()
+{
+   int ipos=0; 
+   ulong lmagic=0;
+   // La funcion cuenta los bot que estan abiertos actualmente. Resetea el array con 0 
+   ArrayResize(ATRENDBOT,9);
+   ArrayFill(ATRENDBOT,0,9,0);
+   // Nuevo array HILO, VALOR
+   ArrayInitialize(ATREND,0);
+   ArrayInitialize(dLOTBULL,0);
+   ArrayInitialize(dLOTBear,0);
+   ArrayInitialize(AminBear,0);
+   ArrayInitialize(AMAXBULL,0);
+   // Valores panel
+   dLotBear=0.0;
+   dLotBULL=0.0;
+   dCommision=0.0;
+   dSwapAll=0.0;
+   
+   ulong ticket=0;
+   for(int i=0;i<PositionsTotal();i++) // returns the number of current positions
+   {
+      if(!cPos.SelectByIndex(i))
+      {
+         Print("Error al seleccionar orden. Error = ",GetLastError());
+         return -1;
+      }
+      if(_Symbol!=cPos.Symbol()) continue; 
+      
+      // Check Bot
+      lmagic=cPos.Magic();
+      if(IsMyMagic(lmagic))
+      {
+         ticket=cPos.Ticket();
+         //// TEST
+        ////////// if(ticket==1222)
+        //// {
+        ////    ipos=(int)(lmagic-MAGICTREND);
+        //// }
+         // Seleccionar deal
+         ipos=(int)(lmagic-MAGICTREND);
+         ATRENDBOT[ipos]=(int)lmagic;
+         // Calculo de comisión: Tamaño del lote * Importe de la comisión * 2(Apertura y cierre).
+         dCommision+=getComisionPos();
+         dSwapAll+=cPos.Swap();
+         if(cPos.PositionType()==POSITION_TYPE_SELL)
+         {
+            dLotBear+=cPos.Volume();
+            dLOTBear[ipos]+=cPos.Volume();
+            // Control de minBear
+            if(AminBear[ipos]==0) AminBear[ipos]=cPos.PriceOpen();
+            if(AminBear[ipos]>cPos.PriceOpen()) AminBear[ipos]=cPos.PriceOpen();
+         }
+         else
+         {
+            dLotBULL+=cPos.Volume();
+            dLOTBULL[ipos]+=cPos.Volume();
+            // Control de MAXBULL
+            if(AMAXBULL[ipos]<cPos.PriceOpen()) AMAXBULL[ipos]=cPos.PriceOpen();
+         }
+         // El proceso siempre retorna el array de menor a mayor ticket
+         for(int x=0;x<99;x++)
+         {
+            // Control si encuentra parar.
+            if(ATREND[ipos][x]==0)
+            {
+               ATREND[ipos][x]=ticket;
+               x=99;
+            }
+         }
+      }
+   }
+   /////////////////////////////////////
+   return 1;
+}
+/// Retorna el código de hilo por la fecha inicial
+string GetTCode()
+{
+   string scode="";
+   scode=DoubleToString(Cacc.Equity(),2);
+   return scode;
+}
+
+// 
+
+short CheckForOpen()
+{
+   int ifreepos=0;
+   double TP0=0.0;
+   double dLotOpen=Lots;
+   double dCommOpen=0.0;
+   double dAddSpread=0.00;
+   //Doble lote en horas de baja actividad
+   datetime dNow=TimeCurrent();
+   MqlDateTime strdate;
+   
+  
+   //Recalc CENT
+   dLotOpen=dLotOpen*iCent;
+// Si hay mucho movimiento salirse
+   if(iMaxSpread < SymbolInfo.Spread())
+   {
+      vtext="El Spread actual "+IntegerToString(SymbolInfo.Spread())+" es superior al máximo configurado en el robot.";
+      ENUMTXT = PRINT;
+      expertLog();
+      return -1;   
+   }
+   // Control de modo lateral para no abrir más
+   if(enumbotmode==LATERAL_MODE)
+   {
+      vtext="Desactivadas nuevas aperturas con modo lateral activado.";
+      ENUMTXT = PRINT;
+      //expertLog();      
+      return 0;
+   }
+//--- additional checking
+   if(TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
+   {
+      // Control de licencias por suscripción
+      if(CheckSilverEnd()==0) return -1;
+      // Tipo de tendencia
+      // Obtener posicion de array disponible
+      ifreepos=GetFreePos();
+      if (ifreepos < 0)
+      {
+         vtext="No se ha creado una nueva orden al haber llegado al máximo de hilos.";
+         ///expertLog();   // Texto pintado en funcion GetFreePos
+         return 0;  
+      }
+      // Cambiar mode del bot
+      enumbotmode=WORKING_DAY;
+      // Reset contador de beneficios
+      ATRENDPROFIT[ifreepos]=Cacc.Balance();
+      // Pintar tendencia. Sólo cuando se va a abrir
+      // Bar is new  
+      checkBardir();
+      // Control doble lote
+      // Controlar doble lote
+      TimeToStruct(dNow,strdate);
+      // Peso del Spread añadir al SL
+      dAddSpread=MathAbs(SymbolInfo.Bid()-SymbolInfo.Ask());
+      if(dAddSpread>(iFrancisca*pips)) dAddSpread=iFrancisca*pips;
+      // Control de comisión
+      dCommOpen+=iComisionPips;
+      // COMENTARIO MAX 32 CHAR
+      ACOMMENT[ifreepos]=GetTCode();
+      ACOMMENT[ifreepos]=BOTNAME+" ("+ACOMMENT[ifreepos]+") : 0";
+      switch(ENUMBARDIR)
+      {
+         case ORDER_TYPE_SELL:
+            // Asignar el numero mágico de ventas   
+            cTrade.SetExpertMagicNumber(ATRENDBOT[ifreepos]);
+            // Control de SWAP
+            if(SymbolInfo.SwapShort()<0)dCommOpen+=4;
+            TP0=SymbolInfo.Bid()-(TakeProfit*pips)-(dCommOpen*pips)-dAddSpread;
+            if(!cTrade.Sell(dLotOpen,_Symbol,0,0,TP0,ACOMMENT[ifreepos]))
+            {
+               vtext="Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operación de "+DoubleToString(Lots)+".";
+               ENUMTXT = PRINT;
+               expertLog();
+            }
+            return 1;
+            break;  
+         case ORDER_TYPE_BUY:
+            // Asignar el numero mágico de ventas
+            cTrade.SetExpertMagicNumber(ATRENDBOT[ifreepos]);
+            // Control de SWAP
+            if(SymbolInfo.SwapLong()<0)dCommOpen+=4;
+            TP0=SymbolInfo.Ask()+(TakeProfit*pips)+(dCommOpen*pips)+dAddSpread;
+            if(!cTrade.Buy(dLotOpen,_Symbol,0,0,TP0,ACOMMENT[ifreepos]))
+            {
+               vtext="Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operación de "+DoubleToString(Lots)+".";
+               ENUMTXT = PRINT;
+               expertLog();
+            }
+            return 1; 
+            break;
+      }     
+   }
+   return 0;
+}
+
+// Obtener una posicion libre en el array
+int GetFreePos()
+{  
+   // Evaluar cuenta para Nº de hilos MAX 9. Cada 1500 1 hilo
+   double dEquity=0;
+   iHilos=0;
+   
+   dEquity=NormalizeDouble(AccountInfoDouble(ACCOUNT_EQUITY),2);
+   iHilos=(int)MathFloor(dEquity/1250);
+   enumthread=FOUNDS;
+   if(iHilos<1)iHilos=1;
+   if(iHilos>iMaxThead) 
+   {
+      iHilos=iMaxThead;
+      enumthread=MAXPARM;
+   }
+   if(iHilos>9)iHilos=9;
+   for(int i=0;i<iHilos;i++)
+   {
+      if(ATRENDBOT[i]==0)
+      {              
+         ATRENDBOT[i]=MAGICTREND+i;
+         vtext="Número de hilos disponibles para la cuenta de "+(string)dEquity+" "+AccountInfoString(ACCOUNT_CURRENCY)+": "+IntegerToString(iHilos);
+         ENUMTXT = PRINT;
+         expertLog();
+         return i;
+      }
+   }
+   return -1;
+}
+// No operar en navidad ni el 1 de agosto (+- 7 días).
+short BotVacation()
+{
+   datetime dNow=TimeCurrent();
+   MqlDateTime strdate;
+   // Si esta desactivado ok
+   if(!bHollidays) return 1;
+   // Esta activado
+   TimeToStruct(dNow,strdate);
+   // Si es navidad
+   if((strdate.mon==12 && strdate.day>19) || (strdate.mon==1 && strdate.day<7) )
+   {
+         vtext="Desactivada apertura en vacaciones de Navidad. FELIZ NAVIDAD.";
+         enumbotmode=CHRISTMAS;
+         //ENUMTXT = PRINT;
+         //expertLog();
+         return 0;
+   }
+   // Vacaciones de verano
+   if((strdate.mon==7 && strdate.day>25) || (strdate.mon==8 && strdate.day<5) )
+   {
+         vtext="Desactivada apertura en vacaciones de verano. El bot esta de vacas.";
+         enumbotmode=SUMMER_TIME;
+         //ENUMTXT = PRINT;
+         //expertLog();
+         return 0;
+   }
+   // Bien
+   return 1;
+}
+
+short MarketClosing()
+{
+   datetime dNow=TimeCurrent();
+   uint session_index=0;
+   ENUM_DAY_OF_WEEK eday;
+   MqlDateTime strdate;
+   long lmagic=0; 
+   double dprice=0.0;
+   // Check date 
+   TimeToStruct(dNow,strdate);
+   eday=(ENUM_DAY_OF_WEEK) strdate.day_of_week;
+   SymbolInfo.Name(_Symbol);
+   SymbolInfo.Refresh();
+   SymbolInfo.RefreshRates();
+   
+   enumthread=MAXPARM;
+   enumbotmode=WORKING_DAY;
+   
+   // No operar la 1a hora de apertura
+   if(strdate.day_of_week==1 && strdate.hour<saddhour)
+   {
+      if(strdate.min==0)
+      {
+         vtext="Desactivada la creación de nuevas operaciones en la primera hora de apertura de mercado.";
+         ENUMTXT = PRINT;
+         expertLog();
+      }
+      return 0;
+   }
+   // Control último día de la semana de forex
+   if(bSoftFriday==true)
+   {
+      if(strdate.day_of_week<4) return 1;
+      // Control jueves tarde / noche
+      if(strdate.day_of_week==4 && (strdate.hour+saddhour)<23) return 1; 
+      if(strdate.min==0)
+      {
+         vtext="Último día de mercado con parámetro de nuevas operaciones desactivado bSoftFriday.";
+         ENUMTXT = PRINT;
+         expertLog();
+      }
+      enumthread=ISFRIDAY;
+      enumbotmode=SOFT_FRIDAY;
+      return 0;      
+   } 
+   return 1;
+}
+
+///////////////////// Funtions get steps
+ulong GetStep(string scomment)
+{
+   ulong lstep=0;
+   // Localizar el array del ticket
+   int ipos=0;
+   ipos=(int)(cPos.Magic()-MAGICTREND);
+   // Si no tiene valor asignar por defecto
+   if(StringLen(scomment)<=0)
+   {
+      // COMENTARIO MAX 32 CHAR
+      scomment=GetTCode();
+      scomment=BOTNAME+" ("+scomment+") : 5";
+      lstep=5;
+      ACOMMENT[ipos]=scomment;
+   }
+   else
+   {
+      // Control de comentario vacio. Calcula por tamaño del lote
+      scomment=StringSubstr(scomment, (StringLen(cPos.Comment())-2));
+      // Control de comentario vacio. Calcula por tamaño del lote
+      StringTrimLeft(scomment);
+      lstep=StringToInteger(scomment);
+   }
+   return lstep;
+}
+
+// Buscar posición emparejada TP=SL
+// Ticket de la que buscar su par
+// Con iPos sabemos si se quiere localizar el salto anterior (-1), posterior(+1) Omega (0) 2 ops en salto TP=TP
+ulong GetPair(ulong ticket,int iPos)
+{
+   double dTPFound = 0.00;
+   double dTP = 0.00;
+   double dSLFound = 0.00;
+   double dSL = 0.00;
+   int ipos=0;
+   // Cargar la el ticket pasado por parámetro
+   if(!cPos.SelectByTicket(ticket))
+   {
+      vtext="Error en GetPair al seleccionar ticket "+IntegerToString(ticket)+" : "+IntegerToString(GetLastError());
+      ENUMTXT = PRINT;
+      expertLog();
+      return 0;
+   }
+   // Localizar el array del ticket
+   ipos=(int)(cPos.Magic()-MAGICTREND);
+   dTPFound=NormalizeDouble(cPos.TakeProfit(),Digits());
+   dSLFound=NormalizeDouble(cPos.StopLoss(),Digits());
+   // Localizar el array del ticket
+   for(int i=0;i<99;i++)
+   {
+      // Si ha llegado al final de las posiciones usadas no existe
+      if(ATREND[ipos][i]==0) return 0;
+      // Si es el ticket a buscar siguiente
+      if(ATREND[ipos][i]==ticket) continue;
+      // Control de ticket a localizar. iPos para menor o Mayor a la actual
+      if((iPos<0) && ATREND[ipos][i]>ticket) continue; // Localizando tickets previos al cargado
+      if((iPos>0) && ATREND[ipos][i]<ticket) continue; // Localizando tickets posteriores al cargado
+      if(!cPos.SelectByTicket(ATREND[ipos][i]))
+      {
+         Print("Error al seleccionar orden. Error = ",GetLastError());
+         return -1;
+      }
+      dTP=NormalizeDouble(cPos.TakeProfit(),Digits());
+      dSL=NormalizeDouble(cPos.StopLoss(),Digits());  
+      // Si lo encuentra retornar valor
+      if(dSLFound==dTP)
+      {
+        // vtext="Encontrado ticket de cobertura "+IntegerToString(ATREND[ipos][i])+" .";
+        // ENUMTXT = PRINT;
+         return ATREND[ipos][i];
+      }
+      if(dTPFound==dSL)
+      {
+        // vtext="Encontrado ticket de compensación "+IntegerToString(ATREND[ipos][i])+" .";
+        // ENUMTXT = PRINT;
+         return ATREND[ipos][i];
+      }
+   }
+   // Bien
+   return 0;
+}
+
+// Se le pasa el tipo y el TP. Hasta 3 saltos dTP + 50%TP. Resto misma distancia
+double GetSLStep(ulong lstep,ENUM_POSITION_TYPE TPOS)
+{
+   double dPrice=0;
+   double dPips=0;
+   double dTP=0;
+   double dNewSL=0;
+   ulong sLateralStep;
+   datetime dNow=TimeCurrent();
+   MqlDateTime strdate;
+   TimeToStruct(dNow,strdate);
+   // Coger el parámetro que ha seleccionado el usuario
+   sLateralStep=GetLateralStep();
+   // Obtener el precio
+   dPrice=cPos.PriceOpen();
+   dTP=cPos.TakeProfit();
+   dPips=MathAbs(dPrice-dTP);
+   // Siempre añadir 50% del TP.
+   if(lstep<sLateralStep)
+   {
+      dPips+=(TakeProfit*0.5*pips);
+   }
+   // Descontar la ganacia para operaciones > 1
+   if(lstep>0)
+   {
+      dPips-=(iFrancisca*2.5*pips);
+   }
+   // Descontar los pips que se añadieron por la comision de apertura
+   dPips-=(iComisionPips*pips);
+   // Calcular el SL dependiendo de la operación.
+   if(TPOS==POSITION_TYPE_SELL)
+   { 
+      dNewSL=NormalizeDouble(dPrice+dPips,Digits());
+   }
+   // Posición de compras. Meter sl negativo
+   else
+   {
+      dNewSL=NormalizeDouble(dPrice-dPips,Digits());
+   }
+   // Bien
+   return dNewSL;
+}
+
+// Sould 50% Lots post. Vende el 50% del lote si la posición es mayor que el mínimo lotaje
+double SoldLotPos(ulong lTicket,double LotToSould)
+{
+   double LotSold=0;
+   // Cargar la el ticket pasado por parámetro
+   if(!cPos.SelectByTicket(lTicket))
+   {
+      vtext="Error en SoldHalfLot al seleccionar ticket "+IntegerToString(lTicket)+" : "+IntegerToString(GetLastError());
+      ENUMTXT = PRINT;
+      expertLog();
+      return 0;
+   }
+   LotSold=LotToSould;
+   if(LotSold<=0)
+   {
+      LotSold=cPos.Volume();
+      // Check halflot
+      if(LotSold<=Lots)
+      {
+         vtext="El lote de venta es menor al mínimo lote:"+DoubleToString(Lots);
+         ENUMTXT = PRINT;
+         //expertLog();
+         return 0;      
+      }
+      LotSold=NormalizeDouble((LotSold/2),lotdecimal);   
+   }
+   // Vender
+   if(!cTrade.PositionClosePartial(lTicket,LotSold))
+   {
+      vtext="Error al actualizar SoldHalfLot en ticket "+IntegerToString(lTicket)+" error:"+IntegerToString(GetLastError());
+      ENUMTXT = PRINT;
+      expertLog();
+      return -1;
+   }
+   // Bien
+   vtext="Se ha realizado correctamente la venta de "+DoubleToString(LotSold,lotdecimal)+" lots en ticket:"+IntegerToString(lTicket);
+   ENUMTXT = PRINT;
+   expertLog();
+   return LotSold;
+}
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// ------------------------------------------- MATRINGALA2 CODE ------------------------------------------------------ //
+// ------------------------------------------------------------------------------------------------------------------- //
+
+// Comprueba si una operación esta en perdidas y llama a la función NewStep
+int CheckNewStep()
+{
+   ulong lTicket=0;
+   ulong lMagic=0;
+   double dpricestep=0.0;
+   double dnewprice=0.0;
+   double dTP=0.0;
+   double dNewTP=0.0;
+   double dSL=0.0;
+   double dCommOpen=0;
+   double dPipStep=0;
+   double dPriceNow=0;
+   double dNextScalp=0.0;
+   int ipos=0;
+   ulong lstep,lNewStep=0;
+   ulong sLateralStep;
+   string scomment;
+   // Coger el parámetro que ha seleccionado el usuario
+   sLateralStep=GetLateralStep();
+   // No saturar el alert del bot
+   datetime dNow=TimeCurrent();
+   // Si hay mucho movimiento salirse
+   if(iMaxSpread < SymbolInfo.Spread())
+   {
+      vtext="El Spread actual "+IntegerToString(SymbolInfo.Spread())+" es superior al máximo configurado en el robot.";
+      ENUMTXT = PRINT;
+      expertLog();
+      return -1;   
+   }
+   // Control de  comisión
+   dCommOpen+=(iComisionPips*pips);
+   ENUM_POSITION_TYPE TYPE_POS=WRONG_VALUE;
+   ENUM_POSITION_TYPE POS_MARKET=WRONG_VALUE;
+   for(int i=0;i<PositionsTotal();i++) // returns the number of current positions
+   ///for(int i=0;i<9;i++) // returns the number of current positions
+   {
+      if(!cPos.SelectByIndex(i))
+      {
+         Print("Error al seleccionar orden. Error = ",GetLastError());
+         continue;
+      }
+      lTicket=cPos.Ticket();
+      if(_Symbol!=cPos.Symbol()) continue;
+      // Si Esta en positivo siguiente
+      if(cPos.Profit()>0 ) continue;
+      dPriceNow=cPos.PriceCurrent();
+      dSL=cPos.StopLoss();
+      // Check Bot
+      // Comprobar cobertura. Volver a cargar cPos porque la función carga el resto de tickets
+      TYPE_POS=cPos.PositionType();
+      dpricestep = cPos.PriceOpen();
+      // Obtener TP
+      dTP=cPos.TakeProfit();
+      // Control de ser el máx/min value. Sólo trabajar con los 2 edges Bear/BULL
+      if(isEdge(ipos)==0) continue;
+      // Control de comentario
+      scomment=cPos.Comment();
+      // // Si el comentario está vacio coger el array
+      if(StringLen(scomment)<=0)
+      {
+         scomment=ACOMMENT[ipos];
+      }
+      // Si sigue sin comentario correcto poner comentario default
+      lstep=GetStep(scomment);
+      lNewStep=lstep+1;
+      lMagic=cPos.Magic();
+      ipos=(int)lMagic-MAGICTREND;
+      // COMENTARIO MAX 32 CHAR
+      StringReplace(scomment,": "+IntegerToString(lstep),": "+IntegerToString(lNewStep)); 
+      ///////////////////////////////////////////////////////////////////////
+      // Calcular SL
+      if(lNewStep>=sLateralStep)
+      {
+         enumbotmode=LATERAL_MODE;
+         dNextScalp=GetLatearSL(lNewStep,sLateralStep);
+         if(dNextScalp<=0) continue;
+         // Control mercado útlima hora
+         POS_MARKET=GetTrendLastH();
+         if(POS_MARKET==TYPE_POS)
+         {
+            vtext="Desactivado nuevo scalp.El mercado tiene dirección:"+EnumToString(POS_MARKET);
+            ENUMTXT = PRINT;
+            expertLog();
+            continue;
+         } 
+      }
+      else
+      {
+         dNextScalp=GetSLStep(lstep,TYPE_POS);
+         // Si el mercado esta en la dirección de la op de perdidas no abrir contraop
+         
+      }
+      // Dependiendo tipo de posición
+      if(TYPE_POS==POSITION_TYPE_SELL)
+      {
+         // Original Venta
+         if(dPriceNow<dNextScalp) continue; 
+         dnewprice=NormalizeDouble(SymbolInfo.Bid(),Digits());         
+         // 1 Generar nueva posción en dir contraria
+         dNewTP=MathAbs(dpricestep-dnewprice);
+         dNewTP=NormalizeDouble(dnewprice+dNewTP+dCommOpen+(iFrancisca*2.5*pips),Digits());
+         // Comprobar precio en zona verce
+         dNewTP=GetGreenPrice(dNewTP,POSITION_TYPE_BUY);
+         dSL=NewStep(dNewTP,lstep,scomment,POSITION_TYPE_BUY,lMagic);
+         // Continue si NewStep es 0
+         if(dSL==0) continue;
+         // Asignar el numero mágico 
+         cTrade.SetExpertMagicNumber(lMagic);
+         // Para saber la cobertura SL = TP de la nueva
+         // 2 Poner SL de posición con problemas
+         if(!cTrade.PositionModify(lTicket,dSL,dTP))
+         {
+            vtext="Error al actualizar CheckNewStep en ticket "+IntegerToString(cPos.Ticket())+" error:"+IntegerToString(GetLastError());
+            ENUMTXT = PRINT;
+            expertLog();
+            return -1;
+         }
+      }
+      else
+      {
+         // Original Compra
+         if(dPriceNow>dNextScalp) continue;
+         dnewprice=NormalizeDouble(SymbolInfo.Ask(),Digits());   
+         // 1 Generar nueva posción
+         dNewTP=MathAbs(dpricestep-dnewprice);
+         dNewTP=NormalizeDouble(dnewprice-dNewTP-dCommOpen-(iFrancisca*2.5*pips),Digits());
+         dNewTP=GetGreenPrice(dNewTP,POSITION_TYPE_SELL);
+         dSL=NewStep(dNewTP,lstep,scomment,POSITION_TYPE_SELL,lMagic);
+         // Continue si NewStep es 0
+         if(dSL==0) continue;
+         // Asignar el numero mágico 
+         cTrade.SetExpertMagicNumber(lMagic);
+         // Para saber la cobertura SL = TP de la nueva
+         // 2 Poner SL de posición con problemas
+         if(!cTrade.PositionModify(lTicket,dSL,dTP))
+         {
+            vtext="Error al actualizar CheckNewStep en ticket "+IntegerToString(cPos.Ticket())+" error:"+IntegerToString(GetLastError());
+            ENUMTXT = PRINT;
+            expertLog();
+            return -1;
+         }        
+      }     
+   }
+   // Save comment
+   ACOMMENT[ipos]=scomment;
+   // Bien
+   return 1;
+}
+
+ulong GetLateralStep()
+{
+   ulong lstep=99;
+   switch(ENUMLATERAL)
+   {
+      case STEP_2:
+         lstep=2;
+         break;
+      case STEP_3:
+         lstep=3;
+         break;
+      case STEP_4:
+         lstep=4;
+         break;
+   }
+   return lstep;
+}
+
+int isEdge(int ipos)
+{
+   int iedge=0;
+   double dPriceOpen=0;
+   dPriceOpen=cPos.PriceOpen();
+   // Controlar q es Edge Bear
+   if(AminBear[ipos]==dPriceOpen) iedge=1;
+   // Controlar q es Edge BULL
+   if(AMAXBULL[ipos]==dPriceOpen) iedge=1;
+   // Retorno
+   return iedge;
+}
+
+double NewStep(double newTP,ulong lstep,string scoment,ENUM_POSITION_TYPE TYPE_POS,ulong lMagic)
+{
+   double LotStep=0.0;
+   double dLotadd=0.0;
+   double dSwap=0.0;
+   double dSL = 0.00;
+   double dTP = 0.00;
+
+   // Tamaño del lote
+   LotStep=cPos.Volume();
+   dLotadd=Lots*iCent; 
+   // Control de lote 
+   ///LotStep=NormalizeDouble((cPos.Volume()*2)+dLotadd, lotdecimal);
+   // TYPE_POS: tiene el proximo valor a crear
+   LotStep=GetDiffThread(lMagic,TYPE_POS);
+   if(LotStep<=0) return 0;
+   // Asignar el numero mágico 
+   cTrade.SetExpertMagicNumber(lMagic); 
+   switch(TYPE_POS)
+   {
+      case POSITION_TYPE_SELL:
+         // Control de SWAP
+         if(SymbolInfo.SwapShort()<0)dSwap=4;
+         dTP=newTP-(dSwap*pips);
+         if(!cTrade.Sell(LotStep,_Symbol,0,dSL,dTP,scoment))
+         {
+            vtext="Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operación de "+DoubleToString(LotStep)+".";
+            ENUMTXT = PRINT;
+            expertLog();
+            return -1;
+         }
+         vtext=scoment+".Tamaño lote:"+DoubleToString(LotStep)+".";
+         break;  
+      case POSITION_TYPE_BUY:
+         // Control de SWAP
+         if(SymbolInfo.SwapLong()<0)dSwap=4;
+         dTP=newTP+(dSwap*pips);
+         if(!cTrade.Buy(LotStep,_Symbol,0,dSL,dTP,scoment))
+         {
+            vtext="Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operación de "+DoubleToString(LotStep)+".";
+            ENUMTXT = PRINT;
+            expertLog();
+            return -1;
+         }
+         vtext=scoment+".Tamaño lote:"+DoubleToString(LotStep)+".";
+         break;
+   }
+   ENUMTXT = PRINT;
+   expertLog();
+   
+   // Contar ops.
+   if(countbot()<0) return -1;
+   // Bien
+   return dTP;
+}
+//              ------------------------------------------------------------------------------------------------------------------- //
+//              ------------------------------------------- MATRINGALA2 CODE ------------------------------------------------------ //
+//              ------------------------------------------------------------------------------------------------------------------- //
+
+// //
+// ------------------------------------------- OPENMARKET CODE ------------------------------------------------------ //
+// ------------------------------------------------------------------------------------------------------------------- //
+// Check last bars and return Order type if there are high market moviment. More than (3*TP/2)
+ENUM_POSITION_TYPE CheckOpenMarket()
+{
+   ENUM_POSITION_TYPE TYPE_POS=WRONG_VALUE;
+   // Check last bars
+   int iBear=0;
+   int iBull=0;
+   double ddiff=0;
+   double dCurrent=0;
+   double dmidPrice=0;
+   for(int i=0;i<ArraySize(rLastBars);i++)
+   {
+   	// esta cerca del medio
+   	dmidPrice=MathAbs(rLastBars[i].high+rLastBars[i].low)/2;
+   	dCurrent=cPos.PriceCurrent();
+   	ddiff=MathAbs(dmidPrice-dCurrent);
+   	if(ddiff>(TakeProfit*3*pips))
+   	{
+   	   vtext="El precio esta alejado de la media diaria.";
+   	   return TYPE_POS;
+   	}
+   	if(dmidPrice>dCurrent)
+   	{
+   	   iBear+=1;
+   	}
+   	else
+   	{
+   	   iBull+=1;
+   	}
+   }
+   // Controlar si es BULL o BEAR
+   if(iBull>ArraySize(rLastBars)-1)
+   {
+      TYPE_POS=POSITION_TYPE_BUY;
+   }
+   if(iBear>ArraySize(rLastBars)-1)
+   {
+      TYPE_POS=POSITION_TYPE_SELL;
+   }
+   //Return value
+   return TYPE_POS;
+}
+
+bool ActivateOpenMarket()
+{
+   bool bactivate=false;
+   ulong lstep=0;
+   datetime dAhora=TimeCurrent();
+   MqlDateTime strdate;
+   TimeToStruct(dAhora,strdate);
+   
+   // Confirmar que el hilo máximo está ocupado
+   if(ATRENDBOT[iMaxThead-1]==0)
+   {              
+      vtext="Aun existen hilos disponibles.";
+      ENUMTXT = PRINT;
+      //expertLog();
+      return bactivate;
+   }
+   // Confirmar que el hilo OpenMarket no esta ocupado
+   if(ATRENDBOT[iMaxThead]!=0)
+   {              
+      vtext="OpenMarket ya fue activado.";
+      ENUMTXT = PRINT;
+      //expertLog();
+      return bactivate;
+   }
+   // Session	Major Market	Hours (GMT)
+   // -----------------------------------------------
+   // Darle 15 MIN al mercado
+   if(strdate.min<15 || strdate.min>30) return false;
+   // Asian Session	Tokyo	11 p.m. to 8 a.m.
+   if(enumopenmarket==OPEN_AS && strdate.hour!=23) return false;
+   // European Session	London	7 a.m. to 4 p.m.
+   if(enumopenmarket==OPEN_EUR && strdate.hour!=8) return false;
+   // North American Session	New York	noon to 8 p.m.
+   if(enumopenmarket==OPEN_US && strdate.hour!=15) return false;
+   // Control de apertura de EUR & US
+   if(enumopenmarket==OPEN_EUR_US)
+   {
+      if(strdate.hour!=8 && strdate.hour!=15)
+      {
+         return false;
+      }  
+   }
+   // Return
+   bactivate=true;
+   return bactivate;
+}
+
+
+
+void AdditionalOpenMarket()
+{
+   double TP0=0.0;
+   ulong lmaxstep=0;
+   double dLotOpen=Lots;
+   double dCommOpen=0.0;
+   double dAddSpread=0.00;
+   datetime dNow=TimeCurrent();
+   int iHighSpread=(iMaxSpread*3);
+   //Recalc CENT
+   dLotOpen=dLotOpen*iCent;
+   ENUM_POSITION_TYPE TYPE_POS=WRONG_VALUE;
+   if(enumopenmarket==DISABLED)
+   {
+      vtext="Desactivado OpenMarket.";
+      ENUMTXT = PRINT;
+      //expertLog();      
+      return;
+   }
+   // Control de modo lateral para no abrir más
+ //  if(enumbotmode==LATERAL_MODE)
+ //  {
+ //     vtext="Desactivado AdditionalOpenMarket con modo lateral activado.";
+ //     ENUMTXT = PRINT;
+ //     //expertLog();      
+ //     return;
+//   }
+   
+// Si hay mucho movimiento salirse
+   if(iHighSpread < SymbolInfo.Spread())
+   {
+      vtext="El Spread actual "+IntegerToString(SymbolInfo.Spread())+" es superior al máximo configurado en el robot.";
+      ENUMTXT = PRINT;
+      expertLog();
+      return;   
+   } 
+   // Comprobar si se puede abrir.
+   if(ActivateOpenMarket()==false)
+   {
+      return;
+   }
+   TYPE_POS=CheckOpenMarket();
+   if(TYPE_POS==WRONG_VALUE)
+   {
+	  vtext="La dirección del mercado es insuficiente para crear HIGHTRENDBOT.";
+      ENUMTXT = PRINT;
+      //expertLog();
+      return;   
+   }
+//--- additional checking
+   if(TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
+   {
+      // Control de licencias por suscripción
+      if(CheckSilverEnd()==0) return;
+      // Control maximo de hilos
+      
+      // Añadir hilo adicional. El máximo de parámetro +1.
+      ATRENDBOT[iMaxThead]=MAGICTREND+iMaxThead;
+      // Reset contador de beneficios
+      ATRENDPROFIT[iMaxThead]=Cacc.Balance();
+      
+      // Peso del Spread añadir al SL
+      dAddSpread=MathAbs(SymbolInfo.Bid()-SymbolInfo.Ask());
+      if(dAddSpread>(iFrancisca*pips)) dAddSpread=iFrancisca*pips;
+      // Control de comisión
+      dCommOpen+=iComisionPips;
+	  // Asignar el numero mágico
+      cTrade.SetExpertMagicNumber(ATRENDBOT[iMaxThead]);
+      // COMENTARIO MAX 32 CHAR
+      ACOMMENT[iMaxThead]=GetTCode();
+      ACOMMENT[iMaxThead]="H"+BOTNAME+" ("+ACOMMENT[iMaxThead]+") : 0";
+      switch(TYPE_POS)
+      {
+         case POSITION_TYPE_SELL:
+            // Control de SWAP
+            if(SymbolInfo.SwapShort()<0)dCommOpen+=4;
+            TP0=SymbolInfo.Bid()-(TakeProfit*pips)-(dCommOpen*pips)-dAddSpread;
+            if(!cTrade.Sell(dLotOpen,_Symbol,0,0,TP0,ACOMMENT[iMaxThead]))
+            {
+               vtext="Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operación de "+DoubleToString(Lots)+".";
+               ENUMTXT = PRINT;
+               expertLog();
+            }
+            break;  
+         case POSITION_TYPE_BUY:
+            // Control de SWAP
+            if(SymbolInfo.SwapLong()<0)dCommOpen+=4;
+            TP0=SymbolInfo.Ask()+(TakeProfit*pips)+(dCommOpen*pips)+dAddSpread;
+            if(!cTrade.Buy(dLotOpen,_Symbol,0,0,TP0,ACOMMENT[iMaxThead]))
+            {
+               vtext="Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operación de "+DoubleToString(Lots)+".";
+               ENUMTXT = PRINT;
+               expertLog();
+            } 
+            break;
+      }
+      // Pintar nueva pos  
+      vtext="Situación propicial para operaciones adicionales : "+EnumToString(TYPE_POS)+" . "+ACOMMENT[iMaxThead];
+      ENUMTXT = PRINT;
+      expertLog();
+      // Contar ops.
+      countbot();
+      return;           
+   }
+}
+
+//              ------------------------------------------------------------------------------------------------------------------- //
+//              ------------------------------------------- OPENMARKET CODE ------------------------------------------------------- //
+//              ------------------------------------------------------------------------------------------------------------------- //
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// ------------------------------------------- FRANCISCADA CODE ------------------------------------------------------ //
+// ------------------------------------------------------------------------------------------------------------------- //
+short goFrancisca()
+{
+   // Coger las posiciones del symbolo y de los nº mágicos reservados
+   ENUM_POSITION_TYPE TYPE_POS;
+   double Dprice=0;
+   double dOpen=0;
+   double dOldTP=0;
+   double dOldSL=0;
+   double DnewTP=0.0;
+   double DnewSL=0.0;
+   ulong lTicketAnt=0;
+   ulong lTicket=0;
+   long lmagic=0;
+   int ipos=0;
+   bool bsold=false;
+
+   //Asignar Franciscada
+   switch(enumfrancisca)
+   {
+      case SIN_FRANCISCA:
+         iFrancisca=0;
+         break;
+      case FRANCISCA_10:
+         iFrancisca=10;
+         break;
+      case FRANCISCA_20:
+         iFrancisca=20;
+         break;
+   }
+   // Recorrer todas las posiciones
+   for(int i=0;i<PositionsTotal();i++) // returns the number of current positions
+   {
+      if(!cPos.SelectByIndex(i))
+      {
+         vtext="Error al seleccionar orden función francisca. Error = "+IntegerToString(GetLastError());
+         ENUMTXT = PRINT;
+         expertLog();
+         continue;
+      }
+     // vtext="Check Franciscada called for.";
+      //ENUMTXT = PRINT;
+      //expertLog();
+      lTicket=cPos.Ticket();
+      lmagic=cPos.Magic();
+      if (_Symbol==cPos.Symbol() && (IsMyMagic(lmagic)>0))
+      {
+         TYPE_POS=cPos.PositionType();
+         ipos=(int)(cPos.Magic()-MAGICTREND);
+         dOpen=cPos.PriceOpen();
+         dOldSL=cPos.StopLoss();
+         dOldTP=cPos.TakeProfit();
+         Dprice=cPos.PriceCurrent();
+         // Comprobar si esta cerca del SLMax para no hacer nada
+         DnewSL=GetSLMax();
+         if(MathAbs(dOldSL==DnewSL)) continue;
+         if(TYPE_POS==POSITION_TYPE_SELL)
+         {
+            DnewSL=dOpen-(TakeProfit*pips);
+            // Mision cumplida. Nueva misión
+            if((dOldSL>0) && (dOldSL<DnewSL))
+            {
+               // Resto de cambios
+               DnewSL=NormalizeDouble((dOldSL-(iFrancisca*pips)),Digits());
+               ///DnewTP=NormalizeDouble(Dprice-(iFrancisca*2*pips),Digits());
+               // Nueva misión 30/10 pips. Sino sería 60/10 muy poco beneficio
+               DnewTP=NormalizeDouble(Dprice-((TakeProfit+iFrancisca)*0.5*pips),Digits());
+            }
+            else
+            {
+               // Primer cambio
+               DnewSL=NormalizeDouble((Dprice+(iFrancisca*pips)),Digits());
+               DnewTP=NormalizeDouble((dOldTP-(iFrancisca*pips)),Digits());
+               bsold=true;
+            }
+            
+            // Control mínimo SL por debajo de precio
+            if(DnewSL<Dprice) DnewSL=NormalizeDouble((Dprice+(iFrancisca*pips)),Digits());  
+         }
+         else  //// BUY
+         {
+            DnewSL=dOpen+(TakeProfit*pips);
+            if(dOldSL>DnewSL)
+            {
+               // Resto de cambios
+               DnewSL=NormalizeDouble((dOldSL+(iFrancisca*pips)),Digits());
+               ////DnewTP=NormalizeDouble((Dprice+(iFrancisca*2*pips)),Digits());
+               // Nueva misión. 30/10 pips. Sino 60/10 muy poco beneficio
+               DnewTP=NormalizeDouble((Dprice+((TakeProfit+iFrancisca)*0.5*pips)),Digits());
+            }
+            else
+            {
+               // Primer cambio
+               DnewSL=NormalizeDouble((Dprice-(iFrancisca*pips)),Digits());
+               DnewTP=NormalizeDouble((dOldTP+(iFrancisca*pips)),Digits());
+               bsold=true;
+            } 
+            // Control mínimo SL por debajo de precio
+            if(DnewSL>Dprice) DnewSL=NormalizeDouble((Dprice-(iFrancisca*pips)),Digits());
+         }
+         // Si hay que actualiar por tp de la posición
+         if(MathAbs(Dprice-dOldTP)<(iFrancisca*pips))
+         { 
+            // Actualizar Posicion
+            if(!cTrade.PositionModify(lTicket,DnewSL,DnewTP))
+            {
+               vtext="Error al actualizar Franciscada en ticket "+IntegerToString(cPos.Ticket())+" error:"+IntegerToString(GetLastError());
+               ENUMTXT = PRINT;
+               expertLog();
+               return -1;
+            }
+            // Matar ticket anteriores y del mismo step menos este
+            if(FrancisKillThread(dOldTP)<0) return -1;
+            vtext="Actalización Franciscada en ticket "+IntegerToString(cPos.Ticket())+" Nuevo SL:"+DoubleToString(DnewSL)+", TP:"+DoubleToString(DnewTP)+".";
+            ENUMTXT = PRINT;
+            expertLog();
+            // Vender el 50% de la posición
+            if (bsold)
+            {
+               if(SoldLotPos(lTicket,0)<0)
+               {
+                  // Error en el 50% de la venta
+                  return 1;
+               }
+            }
+         }
+      }  
+   }
+   // Franciscada finalizada
+   return 1;
+}
+// Funtion will be kill previous op of Franciscana triggered correctly
+// Cerrar tiket contrarios al q proboco el kill
+short FrancisKillThread(double dTP)
+{
+   // Recorrer todo el hilo, cerrar tiket de step -1 y step menos el de francisca.
+   ulong lticket=0;
+   double dSL=0;
+   int ithread=0;
+   // Coger el el hilo
+   ithread=(int)cPos.Magic()-MAGICTREND;
+   for(int ipos=0;ipos<99;ipos++) // recorrer dimesion pos
+   {
+      if(ATREND[ithread][ipos]==0)
+      {
+         // Final de hilo
+         ipos=99;
+      }
+      else
+      {
+         lticket=ATREND[ithread][ipos];
+         if(!cPos.SelectByTicket(lticket))
+         {
+            vtext="Error al seleccionar orden función FrancisKill. Error = "+IntegerToString(GetLastError());
+            ENUMTXT = PRINT;
+            expertLog();
+            return -1;
+         }
+         dSL=cPos.StopLoss();
+         
+         // Si está aqui es para cerrar.SL=TP
+         if(_Symbol==cPos.Symbol() && dSL==dTP)
+         {   
+            if(!cTrade.PositionClose(lticket))
+            {
+               vtext="Error en FrancisKill cerrar el ticket "+IntegerToString(cPos.Ticket())+" error:"+IntegerToString(GetLastError());
+               ENUMTXT = PRINT;
+               expertLog();
+               return -1;
+            }
+            vtext="FrancisKill realizado.Ticket cerrado: "+IntegerToString(lticket);
+            ENUMTXT = PRINT;
+            expertLog();   
+         }
+      }
+
+   }
+   // Bien
+   return 1;
+}
+
+  
+//              ------------------------------------------------------------------------------------------------------------------- //
+//              ------------------------------------------- FRANCISCADA CODE ------------------------------------------------------ //
+//              ------------------------------------------------------------------------------------------------------------------- //
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// ---------------------------------------------- LATERAL CODE ------------------------------------------------------- //
+// ------------------------------------------------------------------------------------------------------------------- //
+// Se le pasa el tipo y el TP. Hasta 4 saltos dTP + 50%TP. Resto misma distancia
+double GetLatearSL(ulong lNewStep,ulong sLateralStep)
+{
+   double dPriceNow=0;
+   double dNewSL=0;
+   double dOpen=0;
+   double dDiff=0;
+   double dMulti=4.5;
+   double dMaxLost=0;
+   ENUM_POSITION_TYPE TPOS=WRONG_VALUE;
+   ENUM_POSITION_TYPE TPOSDAY=WRONG_VALUE;
+   // Coger la dirección de ayer. (También obtiene en var globales las el max/min (media cierre/apertura y max/min)
+   TPOSDAY=GetDirDay();
+   if(TPOSDAY==WRONG_VALUE) return 0;
+   dOpen=cPos.PriceOpen();
+   dPriceNow=cPos.PriceCurrent();
+   TPOS=cPos.PositionType();
+   // Si llega aqui la posición está en perdidas
+   dDiff=MathAbs(dOpen-dPriceNow);
+   // Si no hay perdidas grandes no hacer nada. < 3TP
+   // Control de step
+   if(lNewStep==sLateralStep && TPOS!=TPOSDAY)
+   {
+      dNewSL=cPos.PriceCurrent();
+      dMulti=2.5;
+   }
+   dMaxLost=TakeProfit*dMulti*pips;
+   if(dDiff<(dMaxLost))
+   {
+      vtext="La operación no tiene grandes perdidas.";
+      ENUMTXT = PRINT;
+      //expertLog();
+      return 0; 
+   }
+
+   //
+   // Posición con problemas SELL y la dirección diaria BUY
+   if(TPOS==POSITION_TYPE_SELL && (dPriceNow>dMaxBull))
+   { 
+      
+      dNewSL=dMaxBull;
+   }
+   // Posición con problemas BUY y la dirección diaria es SELL
+   if(TPOS==POSITION_TYPE_BUY && dPriceNow<dMinBear)
+   {
+      
+      dNewSL=dMinBear;
+   }
+   // Retorna el valor diario o 0 que es que no abra.
+   return dNewSL;
+}
+
+ENUM_POSITION_TYPE GetTrendLastH()
+{
+   ENUM_POSITION_TYPE TYPE_POS=POSITION_TYPE_BUY;
+   MqlRates rBars[];
+   datetime timeAgo,timeNow;
+   double dNow,dAgo;
+   timeNow=TimeCurrent();
+   timeAgo=timeNow-3600;
+   int copied=CopyRates(Symbol(),0,timeAgo,timeNow,rBars);
+   // Ver desde apertura hasta precio
+   dAgo=rBars[0].open;
+   dNow=rBars[copied-1].open;
+   // Control de valores tipo SELL
+   if(dAgo>dNow)
+   {
+      TYPE_POS=POSITION_TYPE_SELL;
+   }
+   // Bien
+   return TYPE_POS;
+}
+// Función para saber el lote proximo a crear en modo lateral: Todas las ops trabajan en la misma dirección.
+// Retornará el doble de lote para crear en la dirección del mercado nuevo step.
+// Se le pasa el tipo de pos más alta con problemas
+double GetDiffThread(ulong lMagic,ENUM_POSITION_TYPE TPOS)
+{
+   double dNewLot=0;
+   double dTotalLot=0;
+   double dPrevLot=0;
+   int iThread=0;
+   iThread=(int)(lMagic-MAGICTREND);
+   if(TPOS==POSITION_TYPE_SELL)
+   {
+      dPrevLot=NormalizeDouble((dLOTBULL[iThread]*2),lotdecimal);
+      dNewLot=dPrevLot-dLOTBear[iThread];
+      dTotalLot=NormalizeDouble(dLOTBear[iThread]+dNewLot,lotdecimal);
+      // Control de máx doble en otra dir
+      if(dTotalLot>dPrevLot) return 0;    
+   }
+   if(TPOS==POSITION_TYPE_BUY)
+   {
+      dPrevLot=NormalizeDouble((dLOTBear[iThread]*2),lotdecimal);
+      dNewLot=dPrevLot-dLOTBULL[iThread];
+      dTotalLot=NormalizeDouble(dLOTBULL[iThread]+dNewLot,lotdecimal);
+      // Control de máx doble en otra dir
+      if(dTotalLot>dPrevLot) return 0;    
+   }
+   // Control de lote correcto
+   if(dNewLot<=0) return 0;
+   if(dNewLot>(0.1*iCent))
+   {
+     dNewLot+=0.01;
+   }
+   dNewLot+=0.01;
+   dNewLot=NormalizeDouble(dNewLot,lotdecimal);
+   // Bien
+   return dNewLot;
+}
+
+// Max step Witch SL allway OK.
+// Disable step > para evistar dejar hurfanas operaciones grandes 
+short SetSLMax()
+{
+   double dOpen = 0.00;
+   double dSL = 0.00;
+   double dNewSL= 0.00;
+   double dTP = 0.00;
+   double dMinPips=0;
+   double dNowPips=0;
+   double dPriceNow = 0.00;
+   ulong ltiket = 0;
+   ulong lMagic=0;
+   double dMulti=0;
+   ENUM_POSITION_TYPE TYPE_POS=POSITION_TYPE_BUY;
+   dMulti=3.5;
+   // Recorrer el Array de MAX
+   for(int i=0;i<PositionsTotal();i++)
+   //////////////////////////////////////////////////////for(int i=0;i<9;i++) 
+   {
+      if(!cPos.SelectByIndex(i))
+      {
+         vtext="Error en SetSLMax seleccionado ticket "+IntegerToString(i)+". Últmo error encontrado:"+IntegerToString(GetLastError())+".No se evaluará.";
+         ENUMTXT = PRINT;
+         expertLog();
+         continue;
+      }
+      if(_Symbol!=cPos.Symbol()) continue;
+      if(cPos.Profit()<0) continue;
+      // Sólo si tiene SL
+      dOpen=cPos.PriceOpen();
+      dTP=cPos.TakeProfit();
+      dSL=cPos.StopLoss();
+      TYPE_POS=cPos.PositionType();
+      // Control que no sea la última op
+      lMagic=cPos.Magic();
+      ltiket=cPos.Ticket();
+      dPriceNow=cPos.PriceCurrent();
+      // Calc pips min.
+      dMinPips=(TakeProfit*dMulti*pips);
+      dNowPips=MathAbs(dOpen-dPriceNow);
+      if(dMinPips>dNowPips) continue;   
+      // Get price for SLMax
+      dNewSL=GetSLMax();   
+      // Si la dir de las barras es buy y el precio aun esta debajo del open realizar un SetSLMax
+      if(TYPE_POS==POSITION_TYPE_SELL)
+      {
+         if(dOpen>dSL && dSL>0) continue;
+         // Control TP 0
+         if(dTP==0) dTP=NormalizeDouble(dSL-((TakeProfit)*pips),Digits());
+      }
+      // Si la dir de las barras es sell y el precio aun esta por encima del open realizar un SetSLMax
+      if(TYPE_POS==POSITION_TYPE_BUY)
+      {
+         if(dOpen<dSL) continue;
+         // Nuevo TP
+         if(dTP==0) dTP=NormalizeDouble(dSL+((TakeProfit)*pips),Digits());
+      }
+      if(dSL!=dNewSL)
+      {
+         // El último step no puede tener SL
+         if(!cTrade.PositionModify(ltiket,dNewSL,dTP))
+         {
+            vtext="Error en SetSLMax actualizar SL a "+DoubleToString(dSL)+" en ticket "+IntegerToString(cPos.Ticket())+"(Ant "+DoubleToString(cPos.StopLoss())+") error:"+IntegerToString(GetLastError());
+            ENUMTXT = PRINT;
+            expertLog();
+            continue;
+         }
+         vtext="SetSLMax ticket "+IntegerToString(ltiket)+" ha actualizado SL a "+DoubleToString(dNewSL)+".";
+         ENUMTXT = PRINT;
+         expertLog();
+      }            
+   }
+   // Bien
+   return 1;   
+}
+// Retorna a función francisca que la op tiene activada SLMax
+double GetSLMax()
+{
+   double dOpen=0.00;
+   double dSL=0.00;
+   ENUM_POSITION_TYPE TYPE_POS;
+   TYPE_POS=cPos.PositionType();
+   dOpen=cPos.PriceOpen();
+   dSL=cPos.StopLoss();
+   if(TYPE_POS==POSITION_TYPE_SELL)
+   {
+      dOpen=NormalizeDouble(dOpen-((TakeProfit/2)*pips),Digits());
+   }
+   else
+   {
+      dOpen=NormalizeDouble(dOpen+((TakeProfit/2)*pips),Digits());
+   }
+   // Retornar precio de SL
+   return dOpen;
+}
+
+// Coger valor del comentario
+double GetProfitComment(int ithread)
+{
+   double dProfit=0;
+   int iposini=0;
+   int iposend=0;
+   string scomment="";
+   // Control Todo limpio
+   if(ATREND[ithread][0]==0)
+   {
+      dProfit=Cacc.Equity();
+      return dProfit;
+   }
+   // Cargar primera operación de array
+   if(!cPos.SelectByTicket(ATREND[ithread][0]))
+   {
+      vtext="Error en GetProfitComment seleccionado ticket "+IntegerToString(ATREND[ithread][0])+". Últmo error encontrado:"+IntegerToString(GetLastError())+".No se evaluará.";
+      ENUMTXT = PRINT;
+      expertLog();
+      return -1;
+   }
+   scomment=cPos.Comment();
+   iposini=StringFind(scomment,"(",0);
+   if(iposini<0) return -1;
+   iposini+=1;
+   iposend=StringFind(scomment,")",iposini);
+   iposend=iposend-iposini;
+   if(iposend<0) return -1;
+   scomment=StringSubstr(scomment,iposini,iposend);
+   dProfit=StringToDouble(scomment);
+   if(dProfit<=0) return -1;
+   return dProfit;
+}
+
+short CheckAllThreadProfit()
+{
+   for(int i=0;i<9;i++)
+   {
+      CheckThreadProfit(i);
+   }
+   return 1;
+}
+
+
+// Funtion EXIT PROFIT THREAD
+short CheckThreadProfit(int ithread)
+{
+   double dhandicap=0;
+   ulong lticket=0;
+   dhandicap=-1;
+   // Si el bot se ha reseteado
+   if(ATRENDPROFIT[ithread]==0)
+   //if(ATRENDPROFIT[ithread]>0) // Test funtion
+   {
+      ATRENDPROFIT[ithread]=GetProfitComment(ithread);
+   }
+   // Recorrer hilo de operaciones para ir sumando los handicap
+   for(int i=0;i<99;i++)
+   {
+      lticket=ATREND[ithread][i];
+      if(lticket==0)
+      {
+         i=99;
+         // Ya tengo todos los hadicap
+         dhandicap=Cacc.Equity()+dhandicap;
+         if(dhandicap>ATRENDPROFIT[ithread])
+         {
+            return CloseThisThread(ithread);
+         }
+      }
+      else
+      {   
+         if(!cPos.SelectByTicket(lticket))
+         {
+            vtext="Error en CheckThreadProfit seleccionado ticket "+IntegerToString(lticket)+". Últmo error encontrado:"+IntegerToString(GetLastError())+".No se evaluará.";
+            ENUMTXT = PRINT;
+            expertLog();
+            continue;
+         }
+         dhandicap+=getComisionPos();
+         dhandicap+=cPos.Swap();
+         // Por cada op 2€
+         dhandicap-= 2;
+      }        
+   }
+   // Bien
+   return 0;  
+}
+// Cerrar hilo. Todo menos el ticket actual
+short CloseThisThread(int ithread)
+{
+   // Recorrer todas las posiciones
+   double dProfit=0;
+   double dOpen=0;
+   dProfit=Cacc.Equity()-ATRENDPROFIT[ithread];
+   ulong lticket=0;
+   for(int i=0;i<99;i++)
+   {
+      lticket=ATREND[ithread][i];
+      if(lticket==0)
+      {
+         // Finalizados Hilo
+         vtext="Hilo cerrado "+IntegerToString(cPos.Magic())+" con ganancias: "+DoubleToString(dProfit,2)+Cacc.Currency()+"." ;
+         ENUMTXT = PRINT;
+         //expertLog();
+         return 1; 
+      }
+      if(!cPos.SelectByTicket(lticket))
+      {
+         vtext="Error al seleccionar orden función CloseThisThread. Error = "+IntegerToString(GetLastError());
+         ENUMTXT = PRINT;
+         expertLog();
+         continue;
+      }
+      dOpen=cPos.PriceOpen();
+      if(_Symbol==cPos.Symbol())
+      {   
+         lticket=cPos.Ticket();
+         // Control de si es el tiket máximo
+         if(cPos.Profit()>0)
+         {
+            if(dOpen==AMAXBULL[ithread] || dOpen==AminBear[ithread])
+            {
+               NewLevelEdge();
+            }
+         }
+         else
+         {
+            if(!cTrade.PositionClose(lticket))
+            {
+               vtext="Error en CloseThisThread cerrar el ticket "+IntegerToString(lticket)+" error:"+IntegerToString(GetLastError());
+               ENUMTXT = PRINT;
+               expertLog();
+               return -1;
+            }
+         }
+
+      }
+   }
+   // Bien
+   return 1;
+}
+short NewLevelEdge()
+{
+   ENUM_POSITION_TYPE TYPE_POS;
+   double dOpen=0;
+   double dNewSL=0;
+   double dNewTP=0;
+   ulong lTicket=0;
+   lTicket=cPos.Ticket();
+   dOpen=cPos.PriceOpen();
+   TYPE_POS=cPos.PositionType();
+   // Dependiendo del tipo
+   if(TYPE_POS==POSITION_TYPE_SELL)
+   {
+      dNewSL=cPos.PriceCurrent();
+      dNewTP=dNewSL;
+      dNewSL=(dNewSL+(iFrancisca*2*pips));
+      dNewTP=(dNewTP-(TakeProfit*pips));
+      // Control dNewSl siempre en ganancias
+      if(dNewSL>(dOpen-(iFrancisca*3*pips))) return 0;   
+   }
+   else
+   {
+      dNewSL=cPos.PriceCurrent();
+      dNewTP=dNewSL;
+      dNewSL=(dNewSL-(iFrancisca*2*pips));
+      dNewTP=(dNewTP+(TakeProfit*pips));
+      // Control dNewSl siempre en ganancias
+      if(dNewSL<(dOpen+(iFrancisca*3*pips))) return 0;         
+   }
+   
+   if(!cTrade.PositionModify(lTicket,dNewSL,dNewTP))
+   {
+      vtext="Error en función NewLevelEdge al actualizar niveles en ticket "+IntegerToString(lTicket)+" error:"+IntegerToString(GetLastError());
+      ENUMTXT = PRINT;
+      expertLog();
+      return -1;
+   }
+   vtext="NewLevelEdge applicado en ticket "+IntegerToString(lTicket);
+   ENUMTXT = PRINT;
+   expertLog();
+   return 1;
+}
+
+
+
+//              ------------------------------------------------------------------------------------------------------------------- //
+//              ----------------------------------------------- LATERAL CODE ------------------------------------------------------ //
+//              ------------------------------------------------------------------------------------------------------------------- //
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// ------------------------------------------- BREAKEVENT CODE ------------------------------------------------------- //
+// ------------------------------------------------------------------------------------------------------------------- //
+// Se le pasa el ticket original para marcar todas las coberturas de ese ticket
+short CheckBreakEvent()
+{
+   // Si no tiene SL es la superior guardarla para cuando se pueda.
+   ulong lTicketProc=0;
+   double dprice = 0.00;
+   double DSL = 0.00;
+   double DnewTP = 0.00;
+   double dLotOpen=Lots*iCent;
+   int iTotalPos=0;
+   iTotalPos=PositionsTotal();
+   // Si esta en modo lateral no hacer nada
+   if(enumbotmode==LATERAL_MODE && iTotalPos>1) return 1;
+   ENUM_POSITION_TYPE TYPE_POS;
+   for(int i=0;i<iTotalPos;i++) // returns the number of current positions
+   {
+      if(!cPos.SelectByIndex(i))
+      {
+         Print("Error al seleccionar orden. Error = ",GetLastError());
+         return -1;
+      }
+      lTicketProc=cPos.Ticket();
+      // No hacer con STEP 0
+      if(cPos.Volume()<=dLotOpen) continue;
+      // Si no está en ganancias siguiente
+      if(cPos.Profit()<0) continue;
+      // Comprobar que no tiene ticket previo al que compensar
+      if(GetPair(lTicketProc,-1)!=0) continue;
+      // Si no tiene para comprobar
+      TYPE_POS=cPos.PositionType();
+      // Si el SL esta en beneficios no tocar en esta función
+      if(CheckSLProfit(TYPE_POS)!=0) continue;
+      dprice=cPos.PriceCurrent();
+      DnewTP=GetTPBreakEvent(TYPE_POS);
+      DnewTP=NormalizeDouble(DnewTP,Digits());
+      // Poner SL según precio actual
+      if(TYPE_POS==POSITION_TYPE_SELL)
+      {
+         DSL=dprice+((iFrancisca)*pips);
+         if(dprice>DnewTP) continue;
+         DnewTP=dprice-((TakeProfit/2)*pips);
+      }
+      else
+      {
+         DSL=dprice-((iFrancisca)*pips);
+         if(dprice<DnewTP) continue;
+         DnewTP=dprice+((TakeProfit/2)*pips);
+      }
+      if(!cTrade.PositionModify(lTicketProc,DSL,DnewTP))
+      {
+         vtext="Error en función ApplyBreakEvent al actualizar niveles en ticket "+IntegerToString(lTicketProc)+" error:"+IntegerToString(GetLastError());
+         ENUMTXT = PRINT;
+         expertLog();
+         return -1;
+      }
+      vtext="BreakEvent aplicado en ticket "+IntegerToString(lTicketProc)+". Nuevo TP:"+DoubleToString(DnewTP,5)+".";
+      ENUMTXT = PRINT;
+      expertLog();
+   }
+   // Bien
+   return 1;
+}
+// Retorna el TP de la oparción cargada: OPEN+ TP +2Francisca
+double GetTPBreakEvent(ENUM_POSITION_TYPE TYPE_POS)
+{
+   double dOpen = 0.00;
+   double DnewTP = 0.00;
+   dOpen=cPos.PriceOpen();
+   if(TYPE_POS==POSITION_TYPE_SELL)
+   {
+      // Mision cumplida. SELL
+      DnewTP=dOpen-((TakeProfit+(iFrancisca*2))*pips);
+   }
+   else
+   {
+      // Mision cumplida. Nueva misión BUY
+      DnewTP=dOpen+((TakeProfit+(iFrancisca*2))*pips);
+   }
+   return DnewTP;  
+}
+// Si el SL esta en beneficios no tocar
+short CheckSLProfit(ENUM_POSITION_TYPE TYPE_POS)
+{
+   // Si no esta asignado retonar generar
+   double DSL = 0.00;
+   double dOpen = 0.00;
+   dOpen=cPos.PriceOpen();
+   DSL=cPos.StopLoss();
+   if(DSL==0) return 0;
+   if(TYPE_POS==POSITION_TYPE_SELL)
+   {
+      // El SL ya esta en profit, no tocar
+      if(DSL<dOpen) return 1;
+   }
+   else
+   {
+       // El SL ya esta en profit, no tocar
+      if(DSL>dOpen) return 1;
+   }
+   // Si llega aqui retornar 0 para proceder con breckevent
+   return 0;  
+
+}
+
+//              ------------------------------------------------------------------------------------------------------------------- //
+//              ------------------------------------------- BREAKEVENT CODE ------------------------------------------------------- //
+//              ------------------------------------------------------------------------------------------------------------------- //
+
+
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// ---------------------------------------------- GREEN CODE --------------------------------------------------------- //
+// ------------------------------------------------------------------------------------------------------------------- //
+
+// Se le pasa el precio del proximo scalp y se ajusta para no estar en zonas cercanas a 0 0 a 50 pips.
+double GetGreenPrice(double dNewPrice,ENUM_POSITION_TYPE TYPE_POS)
+{
+   // Para la mayoría de pares de divisas 1 pip es 0.00001; para pares de divisas con el Yen Japonés como EUR/JPY 1 pip es 0.001
+   double dCalc=0;
+   double dPipsNew=0;
+   string sRighPips;
+   int iPips;
+   dCalc=dNewPrice;
+   sRighPips=DoubleToString(dNewPrice,5);
+   // Control puto YEN
+   if(pips==0.001)
+   {
+      sRighPips=DoubleToString(dNewPrice,3);
+   }
+   // Hacer siempre la posición más cercana a la operación a finalizar (ganar menos pero asegurar).
+   if(TYPE_POS==POSITION_TYPE_BUY)
+   {
+      dPipsNew=(iFrancisca*0.5*pips)*(-1);
+   }
+   else
+   {
+      dPipsNew=(iFrancisca*0.5*pips);
+   }
+   sRighPips=StringSubstr(sRighPips, StringLen(sRighPips)-2,2);
+   iPips=(int)sRighPips;
+   // Control de saltos
+   if((iPips>46 && iPips<54) || (iPips>95 || iPips<5))
+   {
+      // Sumar iFrancisca
+      dCalc=(dNewPrice+(dPipsNew));
+   }
+   // Bien
+   return dCalc;
+}
+
+
+
+//              ------------------------------------------------------------------------------------------------------------------- //
+//              ---------------------------------------------- GREEN CODE --------------------------------------------------------- //
+//              ------------------------------------------------------------------------------------------------------------------- //
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////// NEW DEVS
+
+// Para grandes lotes si la misión es > 60% reducir el 50% de lote en contra y aumentar un 25% los pips para ajustar.
+// ------------------------------------------------------------------------------------------------------------------- //
+// ---------------------------------------------- DOWNHIGHLOT -------------------------------------------------------- //
+// ------------------------------------------------------------------------------------------------------------------- //
+short CheckHighlotDown()
+{
+   double dLotPos=0;
+   double dHighLotDownCent=0;
+   // Calc lot with CENT VAR
+   dHighLotDownCent=(iHighLotDown*iCent);
+   // Check all ops
+   for(int i=0;i<PositionsTotal();i++) // returns the number of current positions
+   {
+      // Load postion
+      if(!cPos.SelectByIndex(i))
+      {
+         Print("Error al seleccionar orden. Error = ",GetLastError());
+         return -1;
+      }
+      // Sólo trabajar con mis operaciones
+      if (_Symbol==cPos.Symbol() && (IsMyMagic(cPos.Magic())>0))
+      {
+         dLotPos = cPos.Volume();
+         if(dLotPos>=dHighLotDownCent)
+         {
+            if(CheckMissionHighLot()>0)
+            {
+               Print("Mission completed. Downlots.");
+               if(DownHighLot()<0) return -1;
+            }
+         }
+      }
+   }
+   // Bien
+   return 1;
+}
+// Si ha llegado al 60% de la misión
+short CheckMissionHighLot()
+{
+   // Si esta en perdidas
+   double dPipsact=0;
+   double dPiptoDown=0;
+   // Si no está en ganancias
+   if(cPos.Profit()<0) return 0;
+   // Si no tiene comentario
+   if(cPos.Comment() == "") return 0;
+   // Controlar los pips de misión al 60%
+   dPiptoDown = MathAbs((cPos.PriceOpen()-cPos.TakeProfit())*0.6);
+   dPipsact =  MathAbs(cPos.PriceOpen()-cPos.PriceCurrent());
+   if(dPipsact<dPiptoDown) return 0;
+   // Si llega aqui mision cumplida
+   return 1;
+}
+
+double GetNewTPHighLot(ENUM_POSITION_TYPE TYPE_POS)
+{
+   double dNewTP=0;
+   double dPips=0;
+   dPips=MathAbs(cPos.PriceOpen()-cPos.TakeProfit())*1.25;   // Bien
+   if(TYPE_POS==POSITION_TYPE_BUY)
+   {
+      dNewTP=cPos.PriceOpen()+dPips;
+   }
+   else
+   {
+      dNewTP=cPos.PriceOpen()-dPips;
+   }
+   if(dNewTP<=0)
+   {
+      vtext="Error en función GetNewTPHighLot.Nuevo valor calculado incorrecto.";
+      ENUMTXT = PRINT;
+      expertLog();
+      return -1;
+   }
+   // Pintar nueva misión
+   vtext="Nuevo TP calculado para HighLot:"+DoubleToString(dNewTP);
+   ENUMTXT = PRINT;
+   expertLog();
+   return dNewTP;
+}
+
+// Bajar el 50% del lote de la operación anterior y añadir un 25% de pips.
+// Trabajar sólo con la operación anidada TP=SL
+short DownHighLot()
+{
+   double dLotSold;
+   double dNewSL=0;
+   double dNewTP=0;
+   string sComment="";
+   long lMagic;
+   ENUM_POSITION_TYPE TYPE_POS;
+   ulong lhighPos, lLowPos;
+   lhighPos=cPos.Ticket();
+   lMagic=cPos.Magic();
+   // Get Values to save
+   sComment=cPos.Comment();
+   TYPE_POS=cPos.PositionType();        
+   // Coger nuevo TP
+   dNewTP=GetNewTPHighLot(TYPE_POS);
+   dNewSL=dNewTP;
+   if(dNewTP<0) return -1;
+   // Coger operación que se compensa
+   lLowPos=GetPair(lhighPos,-1);
+   // Si no se identifica una posición anterior no hacer nada
+   if(lLowPos<=0)
+   {
+      vtext="No se ha podido localizar operación previa.";
+      ENUMTXT = PRINT;
+      //expertLog();
+      return 0;
+   }
+   // Sold Down op
+   dLotSold=SoldLotPos(lLowPos,0);
+   if(dLotSold<=0)
+   {
+      return 0;
+   }
+   // Actualizar SL LowPos. cPos tiene la posición anterior
+   if(!cTrade.PositionModify(lLowPos,dNewSL,cPos.TakeProfit()))
+   {
+      vtext="Error al actualizar DownHighLot en ticket "+IntegerToString(lLowPos)+" error:"+IntegerToString(GetLastError());
+      ENUMTXT = PRINT;
+      expertLog();
+      return -1;
+   }  
+   // Sold up op
+   dLotSold=SoldLotPos(lhighPos,dLotSold);
+   if(dLotSold<=0)
+   {
+      return 0;
+   }
+   // Actualizar TP HighPos. cPos tiene la posición High
+   if(!cTrade.PositionModify(lhighPos,cPos.StopLoss(),dNewTP))
+   {
+      vtext="Error al actualizar DownHighLot en ticket "+IntegerToString(lhighPos)+" error:"+IntegerToString(GetLastError());
+      ENUMTXT = PRINT;
+      expertLog();
+      return -1;
+   }  
+   // Bien 
+   return 1;
+}
+
+//              ------------------------------------------------------------------------------------------------------------------- //
+//              ---------------------------------------------- DOWNHIGHLOT -------------------------------------------------------- //
+//              ------------------------------------------------------------------------------------------------------------------- //
+
+
+
+///////////////////////////// DEPRECIDED FUNTIONS
+
+
