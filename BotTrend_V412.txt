@@ -223,8 +223,6 @@ void OnTick()
       if(SetSLMax()<0) return;
       // Check for new steps
       if(CheckNewStep()<0) return;
-      //HIGHTRENDBOT. Aqui tiene la variable activada enumbotmode=LATERAL_MODE para no abrir
-      AdditionalOpenMarket();
       // Comprobar BreakEvent
       if(CheckBreakEvent()<0) return;
       // Comprobar hilo en beneficios
@@ -240,6 +238,8 @@ void OnTick()
       // Open new positions
       if(MarketClosing()==0) return;
       if(BotVacation()==0) return;
+      //HIGHTRENDBOT. Aqui tiene la variable activada enumbotmode=LATERAL_MODE para no abrir
+      AdditionalOpenMarket();
       // Control de apertura 0 para abrir un hightrend si procede
       if(CheckForOpen()<0) return;
    }
@@ -2182,9 +2182,6 @@ double GetGreenPrice(double dNewPrice,ENUM_POSITION_TYPE TYPE_POS)
 //              ---------------------------------------------- GREEN CODE --------------------------------------------------------- //
 //              ------------------------------------------------------------------------------------------------------------------- //
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-///////////////////////////// NEW DEVS
 
 // Para grandes lotes si la misión es > 60% reducir el 50% de lote en contra y aumentar un 25% los pips para ajustar.
 // ------------------------------------------------------------------------------------------------------------------- //
@@ -2333,8 +2330,11 @@ short DownHighLot()
 //              ---------------------------------------------- DOWNHIGHLOT -------------------------------------------------------- //
 //              ------------------------------------------------------------------------------------------------------------------- //
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////// NEW DEVS
 
 
 ///////////////////////////// DEPRECIDED FUNTIONS
+
 
 
