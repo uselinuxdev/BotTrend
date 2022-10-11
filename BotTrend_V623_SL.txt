@@ -262,7 +262,7 @@ void LoadLicenceAccount()
    ArrayFill(ALOGINGOLD,0,25,0);
    // Creator accounts
    ALOGINGOLD[0]=9290;
-   ALOGINGOLD[1]=1300619945;    /// LOPERA DEMO ACCOUNT
+   ALOGINGOLD[1]=67059701;    /// ROBOFOREX
    ALOGINGOLD[2]=849686;    /// DEMO ACCOUNT VANTAGE
    // Client accounts
    // USE VANTAGE LIVE & DEMO
@@ -1105,14 +1105,14 @@ int CheckNewStep()
    sZgravityStep=GetGravityStep();
    // No saturar el alert del bot
    datetime dNow=TimeCurrent();
-   // Si hay mucho movimiento salirse
-   if(iFrancisca < SymbolInfo.Spread())
-   {
-      vtext="El Spread actual "+IntegerToString(SymbolInfo.Spread())+" es superior al máximo configurado en el robot.";
-      ENUMTXT = PRINT;
-      expertLog();
-      return -1;   
-   }
+   // Si hay mucho movimiento salirse.... DESPUES DE TEST ES MEJOR Q ENTRE LA OP.
+  // if(iFrancisca < SymbolInfo.Spread())
+  // {
+  //    vtext="El Spread actual "+IntegerToString(SymbolInfo.Spread())+" es superior al máximo configurado en el robot.";
+   //   ENUMTXT = PRINT;
+   //   expertLog();
+   //   return -1;   
+  // }
    ENUM_POSITION_TYPE TYPE_POS=WRONG_VALUE;
    for(int i=0;i<PositionsTotal();i++) // returns the number of current positions
    {
