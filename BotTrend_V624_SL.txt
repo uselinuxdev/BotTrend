@@ -2519,7 +2519,7 @@ short CheckBreakEventDown()
       if(bCheckSlProfit()== true) continue;
       //Control si el hilo esta en gravedad 0 no tocar
       TYPE_POS=cPos.PositionType();
-      lstep=GetStep(ACOMMENT[i]);
+      lstep=GetStep(cPos.Comment());
       if(lstep>=sZgravityStep)
       {
           vtext="CheckBreakEventDown desactivado. Gravedad 0 activata en hilo Nº"+IntegerToString(i);
