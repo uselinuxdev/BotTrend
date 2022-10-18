@@ -1147,16 +1147,17 @@ int CheckNewStep()
       if(cPos.Profit()>0 ) continue;
       dPriceNow=cPos.PriceCurrent();
       dSL=cPos.StopLoss();
+      // Comprobar cobertura. Volver a cargar cPos porque la función carga el resto de tickets
+      TYPE_POS=cPos.PositionType();
       // Control barra actual dirección diferente a la posición con problemas: SELL la BARRA tiene q ser BULL para abrir nueva BULL
-      TBAR=GetLastDir();
+      //TBAR=GetLastDir();
+      TBAR=CheckDirHour(1);
       if(TYPE_POS==TBAR)
       {
          vtext="La barra actual tiene la misma dirección que la operación con gran GAP.";
          continue;
       }
       // Check Bot
-      // Comprobar cobertura. Volver a cargar cPos porque la función carga el resto de tickets
-      TYPE_POS=cPos.PositionType();
       dpricestep = cPos.PriceOpen();
       // Obtener TP
       dTP=cPos.TakeProfit();
