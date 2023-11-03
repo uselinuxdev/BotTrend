@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+f
 #property copyright "Copyright 2020, Usefilm Corp."
 #property link      "https://www.mql5.com"
-#property version   "1.00"
+#property version   "1.10"
 #include <Controls\CheckGroup.mqh>
 #include <Controls\Dialog.mqh>
 #include <Controls\Label.mqh>
@@ -24,15 +24,15 @@
 #define CONTROLS_GAP_X                      (5)       // gap by X coordinate
 #define CONTROLS_GAP_Y                      (5)       // gap by Y coordinate
 //--- for Imagen
-#define IMG_WIDTH                           (155)       // gap by X coordinate
+#define IMG_WIDTH                           (145)       // gap by X coordinate
 #define IMG_HEIGHT                          (60)       // gap by Y coordinate
 
 //--- for buttons
 #define BUTTON_WIDTH                        (100)     // size by X coordinate
 #define BUTTON_HEIGHT                       (20)      // size by Y coordinate
 //--- for the indication area
-#define EDIT_WIDTH                          (100)     // size by X coordinate
-#define EDIT_WIDTHHMID                      (70)      // size by X coordinate
+#define EDIT_WIDTH                          (140)     // size by X coordinate
+#define EDIT_WIDTHHMID                      (95)      // size by X coordinate
 #define EDIT_HEIGHT                         (20)      // size by Y coordinate
 
 
@@ -57,7 +57,6 @@ private:
    CEdit             m_editBULL2;                      // the display field object
    CEdit             m_editBear3;                      // the display field object
    CEdit             m_editBULL3;                      // the display field object
-   CEdit             m_editSCALP;                      // the display field object
  
 public:
                      CControlsDialog(void);
@@ -66,7 +65,7 @@ public:
    virtual bool      Create(const long chart,const string name,const int subwin,const int x1,const int y1,const int x2,const int y2);
    //--- chart event handler
    virtual bool      OnEvent(const int id,const long &lparam,const double &dparam,const string &sparam);
-   bool              UpdatePannel(string smode,double dlotbull, double dlotbear, int ihilos, string shilos, double dcommision, double dswap, double dnextscalp);
+   bool              UpdatePannel(string smode,double dlotbull, double dlotbear, int ihilos, string shilos, double dcommision, double dswap);
  
 protected:
    //--- create dependent controls
@@ -133,7 +132,7 @@ bool CControlsDialog::CreatePicture(void)
       return(false);
 //--- benennen wir die bmp-Dateien für die Anzeige des CPicture Steuerelements
    //m_picture.BmpName("\\Experts\\Usebots\\resources\\Bull_bear_Wall_small.bmp");
-   m_picture.BmpName("\\Images\\Bull_bear_Wall_small.bmp");
+   m_picture.BmpName("\\Images\\Bear_Bull_yellow_blue.bmp");
    if(!Add(m_picture))
       return(false);
 //--- succeed
@@ -165,7 +164,7 @@ bool CControlsDialog::CreateLabel1(void)
 bool CControlsDialog::CreateEditMode(void)
   {
 //--- coordinates
-   int x1=CONTROLS_GAP_X+90;
+   int x1=CONTROLS_GAP_X+100;
    int y1=CONTROLS_GAP_Y;
    int x2=x1+EDIT_WIDTH;
    int y2=y1+EDIT_HEIGHT;
@@ -214,7 +213,7 @@ bool CControlsDialog::CreateLabelDetails(void)
 //--- create
    if(!m_label2.Create(m_chart_id,m_name+"Label2",m_subwin,x1,y1,x2,y2))
       return(false);
-   if(!m_label2.Text("Lotaje total BULL / Bear "))
+   if(!m_label2.Text("Lotaje total BULL/Bear "))
       return(false);
    if(!Add(m_label2))
       return(false);
@@ -241,13 +240,6 @@ bool CControlsDialog::CreateLabelDetails(void)
 //   -- Label5
    y1=y2+CONTROLS_GAP_Y;
    y2=y1+20;
-//--- create
-   if(!m_label5.Create(m_chart_id,m_name+"Label5",m_subwin,x1,y1,x2,y2))
-      return(false);
-   if(!m_label5.Text("Next Scalp "))
-      return(false);
-   if(!Add(m_label5))
-      return(false);
 //--- succeed
    return(true);
   }
@@ -347,21 +339,6 @@ bool CControlsDialog::CreateEditBearBULL(void)
    // Desactivar control
    if(!m_editBear3.ReadOnly(true))
       return(false);
-   //--- Create NEXTSCALP
-   x1=CONTROLS_GAP_X*2+185;
-   y1=y1+24;
-   x2=x1+EDIT_WIDTHHMID;
-   y2=y1+EDIT_HEIGHT;
-   if(!m_editSCALP.Create(m_chart_id,m_name+"m_editSCALP",m_subwin,x1,y1,x2,y2))
-      return(false);
-   if(!m_editSCALP.Text(DoubleToString(0,5)))
-      return(false);
-   if(!Add(m_editSCALP))
-      return(false);  
-   m_editSCALP.Alignment(ALIGN_CENTER,0,0,INDENT_RIGHT,0);
-   // Desactivar control
-   if(!m_editSCALP.ReadOnly(true))
-      return(false);
 //--- succeed
    return(true);
   }   
@@ -371,9 +348,10 @@ bool CControlsDialog::CreateEditBearBULL(void)
 //+------------------------------------------------------------------+
 //| Set check for element                                            |
 //+------------------------------------------------------------------+
-bool CControlsDialog::UpdatePannel(string smode,double dlotbull, double dlotbear, int ihilos, string shilos, double dcommision, double dswap, double dnextscalp)
+bool CControlsDialog::UpdatePannel(string smode,double dlotbull, double dlotbear, int ihilos, string shilos, double dcommision, double dswap)
   {
   // Act. mode
+   
    if(!m_editMode.Text(smode))
       return(false);
    // Linea 1
@@ -390,8 +368,6 @@ bool CControlsDialog::UpdatePannel(string smode,double dlotbull, double dlotbear
    if(!m_editBULL3.Text(DoubleToString(dcommision,2)))
       return(false); 
    if(!m_editBear3.Text(DoubleToString(dswap,2)))
-      return(false); 
-   if(!m_editSCALP.Text(DoubleToString(dnextscalp,5)))
       return(false); 
 // -- All ok
    return(true);
