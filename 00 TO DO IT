@@ -1,0 +1,24 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// VERSION 8.25
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+		- Limites de hilo: NextBear[], NextBULL[].
+			- Al crear operación inicial.
+				- STEP 1 valor de apertura STEP1 (TP + iComision), poner valores de hilo.
+				- STEP 2 valor STEP 0 -+ 2 IFranciscas.
+			- STEP2 y 3: Actualizar sólo dirección -+2 iFranciscas. 
+			- Indicar los límites de hilo de log experto.
+			- Usar limites de belas desde inicio de hilo para actualizar en cada dirección. Pintar valor en alert.
+			- G0. Resetea valores de hilo NexBear, NextBull.
+			
+		- SL Function: Cada minuto. Independicar función de GZero.
+			- Operaciones normales:2TP/2ifrancisca.
+			- Operaciones Zero: 3.5TP/2iFrancisca.
+			- Poner valor de operación en esa dirección en SL +- 1TP, en el next de esa dir. Pintar limites hilo en log experto.
+			- Si vuelve a operación contraria en positivo. Resetear Next contrario. Usará los límites diarios standar.
+			- Al crear nueva G1 resetear valor NextBear/NextBULL till SL funcition.
+
+		- Función CloseThisThread pinta continuamente se da en hilos pequeños. 
+			- En hilo standar cerrar 1/2 ganancia defecto.
+
+VERSION ERROR 2022 DICIEMBRE.	  <-- CHECK EN DIFERENTES VERSIONES
