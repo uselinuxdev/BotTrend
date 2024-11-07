@@ -9,9 +9,15 @@
 			- STEP2 y 3: Actualizar sólo dirección -+2 iFranciscas. Cada minuto analizar barras,sólo si la dirección edge actualizar esa dir.
 			- Indicar los límites de hilo de log experto. Cada minuto analizar barras si cambia.
 			- Usar limites de belas desde inicio de hilo para actualizar en cada dirección. Pintar valor en alert.
-			- G0. Borrar valores TP.
-				Resetea valores de hilo NexBear, NextBull.
-			- G0. Función de igualar lote poner en el nivel G0 pero valor G1. Para que SL la actualice.
+			- Operaciones iniciales desaparecen:
+				- Al llegar a TP. Desaparecera la pequeña anterior por franciskill.
+				- Al iniciar hilo en mode G0 se borrarán todos los TP. La función sl tocará todas las operaciones menos G0.
+			- G0.:Borrar valores TP.
+			- Función de nivel G0.
+				- Será la primera G0 encontrada +- 3 iFranciscas.
+				- Si no hay G0, asignar la medía absoluta de operationes.
+				- Se llama si no está definida, en función si hay un valor asignado se pondrá ese.
+			- G0. Función de igualar lote poner en el nivel G0. G0 de 0.01 y G1 por el resto de lote para q SL realice limpiezas.
 			
 		- SL Function: Cada minuto. Independicar función de GZero.
 			- Operaciones normales:2TP/2ifrancisca.
