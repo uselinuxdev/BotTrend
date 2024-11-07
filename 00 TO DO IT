@@ -12,7 +12,9 @@
 			- Operaciones iniciales desaparecen:
 				- Al llegar a TP. Desaparecera la pequeña anterior por franciskill.
 				- Al iniciar hilo en mode G0 se borrarán todos los TP. La función sl tocará todas las operaciones menos G0.
-			- G0.:Borrar valores TP.
+			- G0.:
+				- Borrar valores TP.
+				- Poner valores G1. MAX/MIN diario de ese momento. Pintar en el log.
 			- Función de nivel G0.
 				- Será la primera G0 encontrada +- 3 iFranciscas.
 				- Si no hay G0, asignar la medía absoluta de operationes.
