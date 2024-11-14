@@ -4,8 +4,8 @@
 	
 		- Limites de hilo: NextBear[], NextBULL[].
 			- Al crear operación inicial.
-				- STEP 1 valor de apertura STEP1 (TP + iComision), poner valores de hilo.
-				- STEP 2 valor STEP 0 -+ 2 IFranciscas.
+				- STEP 1 valor de apertura STEP1 (TP + iComision), poner valores de hilo. <-- OK
+				- STEP 2 valor STEP 0 -+ 2 IFranciscas. <-- OK : Working on funtion UpdateThreadPrices
 			- STEP2 y 3: Actualizar sólo dirección -+2 iFranciscas. Cada minuto analizar barras,sólo si la dirección edge actualizar esa dir.
 			- Indicar los límites de hilo de log experto. Cada minuto analizar barras si cambia.
 			- Usar limites de belas desde inicio de hilo para actualizar en cada dirección. Pintar valor en alert.
