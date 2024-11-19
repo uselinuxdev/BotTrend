@@ -13,12 +13,12 @@
 		- Al llegar a TP. Desaparecera la pequeña anterior por franciskill. <-- OK
 		- Al iniciar hilo en mode G0 se borrarán todos los TP. La función sl tocará todas las operaciones menos G0. <-- OK
 - G0.:
-	- Borrar valores TP.
-	- Poner valores G1. MAX/MIN diario de ese momento. Pintar en el log.
+	- Borrar valores TP. <-- OK
+	- Poner valores G1. MAX/MIN diario de ese momento. Pintar en el log.  <-- Definir en proximo dev
 	- Función de nivel G0.
-		- Será la primera G0 encontrada +- 3 iFranciscas.
-		- Si no hay G0, asignar la medía absoluta de operationes.
-		- Se llama si no está definida, en función si hay un valor asignado se pondrá ese.
+		- Será la primera G0 encontrada +- 1 TakeProfit. <-- OK
+		- Si no hay G0, asignar la medía absoluta de operationes. <-- OK
+		- Se llama si no está definida, en función si hay un valor asignado se pondrá ese. <-- OK
 		- G0. Función de igualar lote poner en el nivel G0. G0 de 0.01 y G1 por el resto de lote para q SL realice limpiezas.
 			
 - SL Function: Cada minuto. Independicar función de GZero.
