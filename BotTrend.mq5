@@ -1,3 +1,4 @@
+
 //+------------------------------------------------------------------+
 //|                                                     BotTrend.mq5 |
 //|                                    Copyright 2020, Usefilm Corp. |
@@ -207,8 +208,6 @@ void OnTick()
    if(countbot()<0) return;
    // Every ticks Check Franciscada
    if(goFrancisca()<0) return;
-   // Comprobar BreakEvent
-   if(CheckBreakEventDown()<0) return;
    // Comprobar hilo en beneficios PRD code
    /////////////////if(CheckAllThreadProfit()<0) return;   
    //// Check for new steps // EN PROD PONER CADA TICK
@@ -226,10 +225,10 @@ void OnTick()
       GetCent();
       // Contar ops.
       if(countbot()<0) return;
-      // Comprobar hilo en beneficios TEST code
-      if(CheckAllThreadProfit()<0) return;
       // 8.25 funtion. Upload prices limits every minute
       if(UpdateThreadPrices()<0) return;
+      // Comprobar hilo en beneficios TEST code
+      if(CheckAllThreadProfit()<0) return;
       // Abrir cada minuto
       if((MarketClosing()!=0) && (BotVacation()!=0))
       {
@@ -476,8 +475,20 @@ short UpdatePrices(int ithread,ulong lTicketEdge)
    // Recorrer las barras, menos la actual
    for(int i=0;i<copied-1;i++)
    { 
-      if((TYPE_POS==POSITION_TYPE_SELL) && (dLPRICE[ithread]>rThreadBars[i].low)) dLPRICE[ithread]=rThreadBars[i].low;
-      if((TYPE_POS==POSITION_TYPE_BUY) && (dHPRICE[ithread]<rThreadBars[i].high)) dHPRICE[ithread]=rThreadBars[i].high;
+      if((TYPE_POS==POSITION_TYPE_SELL) && (dLPRICE[ithread]>rThreadBars[i].low)) 
+      {
+         dLPRICE[ithread]=rThreadBars[i].low;
+         vtext="UpdatePrices: Actualizado precio Bear:"+DoubleToString(dLPRICE[ithread]);
+         ENUMTXT = PRINT;
+         expertLog(); 
+      }
+      if((TYPE_POS==POSITION_TYPE_BUY) && (dHPRICE[ithread]<rThreadBars[i].high)) 
+      {
+         dHPRICE[ithread]=rThreadBars[i].high;
+         vtext="UpdatePrices: Actualizado precio Bull:"+DoubleToString(dHPRICE[ithread]);
+         ENUMTXT = PRINT;
+         expertLog(); 
+      }
    }
    // Bien
    return 1;
@@ -948,7 +959,11 @@ short CheckAllThreadProfit()
 {
    for(int i=0;i<9;i++)
    {
-      CheckThreadProfit(i);
+      // Sólo si el hilo tiene ops
+      if(ATREND[i][0]>0)
+      {
+         CheckThreadProfit(i);
+      }
    }
    return 1;
 }
@@ -959,7 +974,6 @@ short CheckThreadProfit(int ithread)
    double dProfitOp=0; // Control del profit de las operaciones actuales
    double dOpadd=-0.25; // add 0.25 by op.
    ulong lticket=0;
-   bool bCloseAll=false;
    
    // Coger el valor mÃ­nimo con el que el usuario asume salirse
    dhandicap=(iExitProfitStep*(-1));
@@ -967,7 +981,6 @@ short CheckThreadProfit(int ithread)
    if(bOpenMarket)
    {
       dhandicap=(dhandicap/2);
-      bCloseAll=true;
    }
    
    // Si el bot se ha reseteado
@@ -987,7 +1000,7 @@ short CheckThreadProfit(int ithread)
          dhandicap=Cacc.Equity()+dhandicap;
          if(dhandicap>ATRENDPROFIT[ithread] || dProfitOp>iExitProfitStep)
          {
-            return CloseThisThread(ithread,bCloseAll);
+            return CloseThisThread(ithread);
          }
       }
       else
@@ -1014,18 +1027,17 @@ short CheckThreadProfit(int ithread)
 }
 
 // Cerrar hilo. Todo menos el ticket actual
-short CloseThisThread(int ithread,bool bCloseAll=false)
+short CloseThisThread(int ithread)
 {
    // Recorrer todas las posiciones
    double dProfit=0;
-   double dOpen=0;
    ulong lmagic;
+   int ipos=0;
    
    bool bnewMision=true;
    dProfit=Cacc.Equity()-ATRENDPROFIT[ithread];
    // ConfirmaciÃ³n CloseThisThread
-   
-   ulong lticket=0;
+   ulong aticket[99];
    // Recorrer todas las posiciones
    for(int i=0;i<PositionsTotal();i++) // returns the number of current positions
    {
@@ -1040,20 +1052,23 @@ short CloseThisThread(int ithread,bool bCloseAll=false)
       lmagic=cPos.Magic();
       // Seleccionar deal
       if(ithread!=(int)(lmagic-MAGICTREND)) continue;
-      dOpen=cPos.PriceOpen();
       if(_Symbol==cPos.Symbol())
       {   
-         lticket=cPos.Ticket();
-         /// CLOSE ALL
-         if(!cTrade.PositionClose(lticket))
-         {
-            vtext="Error en CloseThisThread cerrar el ticket "+IntegerToString(lticket)+" error:"+IntegerToString(GetLastError());
-            ENUMTXT = PRINT;
-            expertLog();
-            return -1;
-         }
+         aticket[ipos]=cPos.Ticket();
+         ipos++;
       }    
    }
+   /// CLOSE ALL
+   for(int i=0;i<ipos;i++)
+   {
+      if(!cTrade.PositionClose(aticket[i]))
+      {
+         vtext="Error en CloseThisThread cerrar el ticket "+IntegerToString(aticket[ipos])+" error:"+IntegerToString(GetLastError());
+         ENUMTXT = PRINT;
+         expertLog();
+         return -1;
+      }
+   } 
    // Nuevo valor de profit
    ATRENDPROFIT[ithread]=Cacc.Equity();
    // Finalizados Hilo
@@ -1135,9 +1150,9 @@ short CheckForOpen()
       ACOMMENT[ifreepos]=BOTNAME+" ("+ACOMMENT[ifreepos]+") : 0";
       // Inicio de limites de hilo. TP + iFrancisca. Saltará en ese precio + otra francisca
       dLPRICE[ifreepos]=SymbolInfo.Ask();
-      dLPRICE[ifreepos]-=((TakeProfit+(iFrancisca))*pips);
+      dLPRICE[ifreepos]-=((TakeProfit+iFrancisca)*pips);
       dHPRICE[ifreepos]=SymbolInfo.Bid();
-      dHPRICE[ifreepos]+=((TakeProfit+(iFrancisca))*pips);
+      dHPRICE[ifreepos]+=((TakeProfit+iFrancisca)*pips);
       switch(ENUMBARDIR)
       {
          case POSITION_TYPE_SELL:
@@ -2181,10 +2196,64 @@ short ClearTP()
 //              ------------------------------------------------------------------------------------------------------------------- //
 
 // ------------------------------------------------------------------------------------------------------------------- //
+// ---------------------------------------------- GREEN CODE --------------------------------------------------------- //
+// ------------------------------------------------------------------------------------------------------------------- //
+
+// Se le pasa el precio del proximo scalp y se ajusta para no estar en zonas cercanas a 0 0 a 50 pips.
+double GetGreenPrice(double dNewPrice,ENUM_POSITION_TYPE TYPE_POS)
+{
+   // Para la mayorÃ­a de pares de divisas 1 pip es 0.00001; para pares de divisas con el Yen JaponÃ©s como EUR/JPY 1 pip es 0.001
+   double dCalc=0;
+   double dPipsNew=0;
+   string sRighPips;
+   int iPips;
+   dCalc=dNewPrice;
+   sRighPips=DoubleToString(dNewPrice,5);
+   // Control puto YEN
+   if(pips==0.001)
+   {
+      sRighPips=DoubleToString(dNewPrice,3);
+   }
+   // Hacer siempre la posiciÃ³n mÃ¡s cercana a la operaciÃ³n a finalizar (ganar menos pero asegurar).
+   if(TYPE_POS==POSITION_TYPE_BUY)
+   {
+      dPipsNew=(iFrancisca*0.5*pips)*(-1);
+   }
+   else
+   {
+      dPipsNew=(iFrancisca*0.5*pips);
+   }
+   sRighPips=StringSubstr(sRighPips, StringLen(sRighPips)-2,2);
+   iPips=(int)sRighPips;
+   // Control de saltos
+   if((iPips>46 && iPips<54) || (iPips>95 || iPips<5))
+   {
+      // Sumar iFrancisca
+      dCalc=(dNewPrice+(dPipsNew));
+   }
+   // Bien
+   return dCalc;
+}
+
+
+
+//              ------------------------------------------------------------------------------------------------------------------- //
+//              ---------------------------------------------- GREEN CODE --------------------------------------------------------- //
+//              ------------------------------------------------------------------------------------------------------------------- //
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////// NEW DEVS
+
+///////////////////////////// DEPRECIDED FUNTIONS
+
+// ------------------------------------------------------------------------------------------------------------------- //
 // ------------------------------------------- BREAKEVENT CODE ------------------------------------------------------- //
 // ------------------------------------------------------------------------------------------------------------------- //
 // Se le pasa el ticket original para marcar todas las coberturas de ese ticket
-short CheckBreakEventDown()
+short CheckBreakEventDownd()
 {
    // Si no tiene SL es la superior guardarla para cuando se pueda.
    ulong lTicketProc=0;
@@ -2242,59 +2311,7 @@ short CheckBreakEventDown()
 //              ------------------------------------------------------------------------------------------------------------------- //
 
 
-// ------------------------------------------------------------------------------------------------------------------- //
-// ---------------------------------------------- GREEN CODE --------------------------------------------------------- //
-// ------------------------------------------------------------------------------------------------------------------- //
 
-// Se le pasa el precio del proximo scalp y se ajusta para no estar en zonas cercanas a 0 0 a 50 pips.
-double GetGreenPrice(double dNewPrice,ENUM_POSITION_TYPE TYPE_POS)
-{
-   // Para la mayorÃ­a de pares de divisas 1 pip es 0.00001; para pares de divisas con el Yen JaponÃ©s como EUR/JPY 1 pip es 0.001
-   double dCalc=0;
-   double dPipsNew=0;
-   string sRighPips;
-   int iPips;
-   dCalc=dNewPrice;
-   sRighPips=DoubleToString(dNewPrice,5);
-   // Control puto YEN
-   if(pips==0.001)
-   {
-      sRighPips=DoubleToString(dNewPrice,3);
-   }
-   // Hacer siempre la posiciÃ³n mÃ¡s cercana a la operaciÃ³n a finalizar (ganar menos pero asegurar).
-   if(TYPE_POS==POSITION_TYPE_BUY)
-   {
-      dPipsNew=(iFrancisca*0.5*pips)*(-1);
-   }
-   else
-   {
-      dPipsNew=(iFrancisca*0.5*pips);
-   }
-   sRighPips=StringSubstr(sRighPips, StringLen(sRighPips)-2,2);
-   iPips=(int)sRighPips;
-   // Control de saltos
-   if((iPips>46 && iPips<54) || (iPips>95 || iPips<5))
-   {
-      // Sumar iFrancisca
-      dCalc=(dNewPrice+(dPipsNew));
-   }
-   // Bien
-   return dCalc;
-}
-
-
-
-//              ------------------------------------------------------------------------------------------------------------------- //
-//              ---------------------------------------------- GREEN CODE --------------------------------------------------------- //
-//              ------------------------------------------------------------------------------------------------------------------- //
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-///////////////////////////// NEW DEVS
-
-///////////////////////////// DEPRECIDED FUNTIONS
 
 double GetSLStepd(ulong lstep,int ithread,datetime doldopen, ENUM_POSITION_TYPE TPOS)
 {
