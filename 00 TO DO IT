@@ -7,11 +7,11 @@
 	- STEP 1 valor de apertura STEP1 (TP + iComision), poner valores de hilo. <-- OK
 	- STEP 2 valor STEP 0 -+ 1 IFranciscas. <-- OK
 	- STEP2 y 3: Actualizar sólo dirección -+1 iFranciscas. Cada minuto analizar barras,sólo si la dirección edge actualizar esa dir. <-- OK
-	- Indicar los límites de hilo de log experto. Cada minuto analizar barras si cambia.
-	- Usar limites de belas desde inicio de hilo para actualizar en cada dirección. Pintar valor en alert.
+	- Indicar los límites de hilo de log experto. Cada minuto analizar barras si cambia. <-- OK
+	- Usar limites de belas desde inicio de hilo para actualizar en cada dirección. Pintar valor en alert. <-- OK
 	- Operaciones iniciales desaparecen:
-		- Al llegar a TP. Desaparecera la pequeña anterior por franciskill.
-		- Al iniciar hilo en mode G0 se borrarán todos los TP. La función sl tocará todas las operaciones menos G0.
+		- Al llegar a TP. Desaparecera la pequeña anterior por franciskill. <-- OK
+		- Al iniciar hilo en mode G0 se borrarán todos los TP. La función sl tocará todas las operaciones menos G0. <-- OK
 - G0.:
 	- Borrar valores TP.
 	- Poner valores G1. MAX/MIN diario de ese momento. Pintar en el log.
