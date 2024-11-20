@@ -14,7 +14,7 @@
 		- Al iniciar hilo en mode G0 se borrarán todos los TP. La función sl tocará todas las operaciones menos G0. <-- OK
 - G0.:
 	- Borrar valores TP. <-- OK
-	- Al iniciar el hilo resetear arrays : dZeroPRICE[9] y DLPRICE[9] and DHPRICE[9].  <-- Definir en proximo dev
+	- Al iniciar el hilo resetear arrays : dZeroPRICE[9] y DLPRICE[9] and DHPRICE[9].  <-- OK
 	- Poner valores G1. MAX/MIN diario de ese momento. Pintar en el log.  <-- Definir en proximo dev
 	- Función de nivel G0.
 		- Será la primera G0 encontrada +- 1 TakeProfit. <-- OK
