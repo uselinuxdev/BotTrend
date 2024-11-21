@@ -21,7 +21,9 @@
 		- Si no hay G0, asignar la medía absoluta de operationes. <-- OK
 		- Se llama si no está definida, en función si hay un valor asignado se pondrá ese. <-- OK
 		- G0. Función de igualar lote poner en el nivel G0. G0 de 0.01 y G1 por el resto de lote para q SL realice limpiezas. <-- OK
-			
+- Función BreakZoneZero: Cuando se defina se carge G0, resetear niveles con soporte.
+	- Sólo leer las últimas 24h de barras en ese momento.
+
 - SL Function: Cada minuto. Independicar función de GZero.
 	- Operaciones normales:2TP/2ifrancisca.
 	- Operaciones Zero+1: 3.5TP/2iFrancisca.
