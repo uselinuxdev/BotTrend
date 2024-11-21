@@ -20,7 +20,7 @@
 		- Será la primera G0 encontrada +- 1 TakeProfit. <-- OK
 		- Si no hay G0, asignar la medía absoluta de operationes. <-- OK
 		- Se llama si no está definida, en función si hay un valor asignado se pondrá ese. <-- OK
-		- G0. Función de igualar lote poner en el nivel G0. G0 de 0.01 y G1 por el resto de lote para q SL realice limpiezas.
+		- G0. Función de igualar lote poner en el nivel G0. G0 de 0.01 y G1 por el resto de lote para q SL realice limpiezas. <-- OK
 			
 - SL Function: Cada minuto. Independicar función de GZero.
 	- Operaciones normales:2TP/2ifrancisca.
