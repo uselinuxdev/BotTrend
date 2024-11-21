@@ -156,6 +156,9 @@ int OnInit()
    pips=ticksize;
    timeCheck=TimeCurrent()+75;
    // INIT ARRAY DE PROFIT
+   ArrayInitialize(dHPRICE,0);
+   ArrayInitialize(dLPRICE,0);
+   ArrayInitialize(dZeroPRICE,0);
    ArrayInitialize(ATRENDPROFIT,0);
    // INIT array de contador de STEP
    countbot(); 
@@ -225,7 +228,7 @@ void OnTick()
       GetCent();
       // Contar ops.
       if(countbot()<0) return;
-      // 8.25 funtion. Upload prices limits every minute
+      // 8.25 funtion. Upload prices limits every minute. Sólo hilos pequeños
       if(UpdateThreadPrices()<0) return;
       // Comprobar hilo en beneficios TEST code
       if(CheckAllThreadProfit()<0) return;
@@ -245,8 +248,6 @@ void OnTick()
       // Coger niveles diarios plus operaciones. 
       // Cada 5 minuto para dar tiempo a q la barra actual se defina.
       if(GetLevels()<0) return;
-      // Niveles G0. SL and TP G-1 (3 operations)
-      if(SetLevelZero()<0) return;
       // Actualiza panel 
       RefressPanel();
    }
@@ -449,6 +450,11 @@ short UpdatePrices(int ithread,ulong lTicketEdge)
    datetime dopen;
    datetime dNow;
    long lmagic;
+   ulong lstep=0;
+   ulong sZgravityStep=0;
+   string scomment;
+   // Coger el parÃ¡metro que ha seleccionado el usuario
+   sZgravityStep=GetGravityStep();
    // Cargar la posición
    if(!cPos.SelectByTicket(lTicketEdge))
    {
@@ -462,6 +468,20 @@ short UpdatePrices(int ithread,ulong lTicketEdge)
    TYPE_POS=cPos.PositionType();
    lmagic=cPos.Magic();
    if (_Symbol!=cPos.Symbol() || (IsMyMagic(lmagic)<0)) return 0;
+   // Control de comentario
+   scomment=cPos.Comment();
+   // // Si el comentario estÃ¡ vacio coger el array
+   if(StringLen(scomment)<=0)
+   {
+      scomment=ACOMMENT[ithread];
+   }
+   // Si sigue sin comentario correcto poner comentario default
+   lstep=GetStep(scomment);
+   // No actualizar valores con hilos en G0.
+   if(lstep>=sZgravityStep)
+   {
+      return 0;
+   }
    dopen=cPos.Time();
    dNow=TimeCurrent();
    // Check all bars since open edge
@@ -1153,13 +1173,12 @@ short CheckForOpen()
       dLPRICE[ifreepos]-=((TakeProfit+iFrancisca)*pips);
       dHPRICE[ifreepos]=SymbolInfo.Bid();
       dHPRICE[ifreepos]+=((TakeProfit+iFrancisca)*pips);
+      dZeroPRICE[ifreepos] = 0; // Resetear valor de Zero.
       switch(ENUMBARDIR)
       {
          case POSITION_TYPE_SELL:
             // Asignar el numero mÃ¡gico de ventas   
             cTrade.SetExpertMagicNumber(ATRENDBOT[ifreepos]);
-            // Control de SWAPMT5|Watch!7
-            if(SymbolInfo.SwapShort()<0)dCommOpen+=4;
             TP0=SymbolInfo.Bid()-(TakeProfit*pips)-(dCommOpen*pips)-dAddSpread;
             if(!cTrade.Sell(dLotOpen,_Symbol,0,0,TP0,ACOMMENT[ifreepos]))
             {
@@ -1172,8 +1191,6 @@ short CheckForOpen()
          case POSITION_TYPE_BUY:
             // Asignar el numero mÃ¡gico de ventas
             cTrade.SetExpertMagicNumber(ATRENDBOT[ifreepos]);
-            // Control de SWAP
-            if(SymbolInfo.SwapLong()<0)dCommOpen+=4;
             TP0=SymbolInfo.Ask()+(TakeProfit*pips)+(dCommOpen*pips)+dAddSpread;
             if(!cTrade.Buy(dLotOpen,_Symbol,0,0,TP0,ACOMMENT[ifreepos]))
             {
@@ -1515,13 +1532,10 @@ int isEdge(int ipos)
    return iedge;
 }
 
-double NewStep(double newTP,ulong lstep,ulong sZgravity,string scoment,ENUM_POSITION_TYPE TYPE_POS,ulong lMagic)
+double NewStep(double dTP,ulong lstep,ulong sZgravity,string scoment,ENUM_POSITION_TYPE TYPE_POS,ulong lMagic)
 {
    double LotStep=0.0;
    double LotOrig=0.00;
-   double dSwap=0.0;
-   double dSL = 0.00;
-   double dTP = 0.00;
    
    // TamaÃ±o del lote
    LotOrig=cPos.Volume();
@@ -1542,11 +1556,7 @@ double NewStep(double newTP,ulong lstep,ulong sZgravity,string scoment,ENUM_POSI
    switch(TYPE_POS)
    {
       case POSITION_TYPE_SELL:
-         // Control de SWAP
-         if(SymbolInfo.SwapShort()<0)dSwap=4;
-         // Calcula TP si la operaciÃ³n es menor a G0
-         if((lstep<sZgravity)) dTP=newTP-(dSwap*pips);
-         if(!cTrade.Sell(LotStep,_Symbol,0,dSL,dTP,scoment))
+         if(!cTrade.Sell(LotStep,_Symbol,0,0,dTP,scoment))
          {
             vtext="Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operaciÃ³n de "+DoubleToString(LotStep)+".";
             ENUMTXT = PRINT;
@@ -1556,18 +1566,14 @@ double NewStep(double newTP,ulong lstep,ulong sZgravity,string scoment,ENUM_POSI
          vtext=scoment+".TamaÃ±o lote:"+DoubleToString(LotStep)+".";
          break;  
       case POSITION_TYPE_BUY:
-         // Control de SWAP
-         if(SymbolInfo.SwapLong()<0)dSwap=4;
-         // Calcula TP si la operaciÃ³n es menor a G0
-         if((lstep<sZgravity)) dTP=newTP+(dSwap*pips);
-         if(!cTrade.Buy(LotStep,_Symbol,0,dSL,dTP,scoment))
+         if(!cTrade.Buy(LotStep,_Symbol,0,0,dTP,scoment))
          {
             vtext="Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operaciÃ³n de "+DoubleToString(LotStep)+".";
             ENUMTXT = PRINT;
             expertLog();
             return -1;
          }
-         vtext=scoment+".TamaÃ±o lote:"+DoubleToString(LotStep)+".";
+         vtext=scoment+".Tamaño lote:"+DoubleToString(LotStep)+".";
          break;
    }
    ENUMTXT = PRINT;
@@ -1796,7 +1802,7 @@ short EqualZero()
    {
       // Llamada hilos 
       diff=MathAbs(dLOTBear[i]-dLOTBULL[i]);
-      if(diff>(dLot*2))
+      if(diff>(0))
       {
          EqualZeroThread(i,sZgravityStep);
       }  
@@ -1804,6 +1810,597 @@ short EqualZero()
    // Bien
    return 1;
 }
+// Generará 2 operaciones 0.01 para G0 y resto G1 para poder ser limpiada por SL funtion.
+short EqualZeroThread(int ithread,ulong sZgravityStep)
+{
+   ulong lticket=0;
+   double dCurrentPrice=0;
+   double dZeroTypePrice=0;
+   double dOpen=0;
+   double dLot=Lots*iCent;
+   double dNewLot=0.00;
+   ulong lstep;
+   string scomment;
+   bool bZero=false;
+   ENUM_POSITION_TYPE TYPE_Break=WRONG_VALUE;
+   // Recorrer hilo de operaciones para ir sumando los handicap
+   dCurrentPrice=cPos.PriceCurrent();
+   // Coger niveles
+   for(int i=0;i<99;i++)
+   {
+      lticket=ATREND[ithread][i];
+      if(lticket==0 || bZero==true)
+      {
+         i=99;
+         if(bZero==false) return 1;
+         // Con el ZeroZone +- 1TP
+         dZeroTypePrice=dZeroPRICE[ithread]-(TakeProfit*pips);
+         // Control de precio con respecto a lÃ­mites
+         if((dCurrentPrice<dZeroTypePrice) && (dLOTBear[ithread] < dLOTBULL[ithread]))
+         {
+            TYPE_Break=POSITION_TYPE_SELL;
+            dNewLot=(dLOTBULL[ithread]-dLOTBear[ithread]);
+            dNewLot=NormalizeDouble(dNewLot,lotdecimal);
+            if(dNewLot>dLot)
+            {
+               if(CreateOpZero(TYPE_Break,dLot,sZgravityStep)<0) return -1;
+               dNewLot-=dLot;
+               dNewLot=NormalizeDouble(dNewLot,lotdecimal);
+               return CreateOpZero(TYPE_Break,dNewLot,sZgravityStep+1);
+            }
+            else
+            {
+               return CreateOpZero(TYPE_Break,dNewLot,sZgravityStep);
+            }
+
+         }
+         // Con el ZeroZone +- 1TP
+         dZeroTypePrice=dZeroPRICE[ithread]+(TakeProfit*pips);
+         if((dCurrentPrice>dHPRICE[ithread]) && (dLOTBULL[ithread] < dLOTBear[ithread]))
+         {
+            TYPE_Break=POSITION_TYPE_BUY;
+            dNewLot=(dLOTBear[ithread]-dLOTBULL[ithread]);
+            dNewLot=NormalizeDouble(dNewLot,lotdecimal);
+            if(dNewLot>dLot)
+            {
+               if(CreateOpZero(TYPE_Break,dLot,sZgravityStep)<0) return -1;
+               dNewLot-=dLot;
+               dNewLot=NormalizeDouble(dNewLot,lotdecimal);
+               return CreateOpZero(TYPE_Break,dNewLot,sZgravityStep+1);
+            }
+            else
+            {
+               return CreateOpZero(TYPE_Break,dNewLot,sZgravityStep);
+            }           
+         }
+         return 1;
+      }
+      else
+      {   
+         if(!cPos.SelectByTicket(lticket))
+         {
+            vtext="Error en BreakOPSLevel seleccionado ticket "+IntegerToString(lticket)+". Ãltmo error encontrado:"+IntegerToString(GetLastError())+".No se evaluarÃ¡.";
+            ENUMTXT = PRINT;
+            expertLog();
+            continue;
+         }
+         // Reseteare niveles de operaciones de hilo
+         dOpen=cPos.PriceOpen();
+         // Coger tipo de op
+         scomment=cPos.Comment();
+         lstep=GetStep(scomment); 
+         // No hacer nada mientras el hilo no se GZero
+         if(lstep>=sZgravityStep) 
+         {
+            // Función para identificar el nivel 0. Si no se ha definido/reseteado bot.
+            if(dZeroPRICE[ithread]<=0) 
+            {
+               if(SetLevelZeroThread(ithread,sZgravityStep)<0) return -1;
+            }
+            bZero=true;
+         }
+      }        
+   }		 
+   // Bien
+   return 1;
+}
+
+
+// FunciÃ³n comprobaciÃ³n rotura niveles diarios
+short CheckBreakDayLevel()
+{
+   double dCurrent=0.00;
+   double dlevel=0.00;
+   // Coger nivel actual
+   dCurrent=(SymbolInfo.Ask()+SymbolInfo.Bid())/2;
+   // Si el mercado no va a abrir
+   if(CheckOpenMarket()==false) return 1;
+   // Control niveles rotos
+   //dlevel=dSupport-(iFrancisca*pips);
+   dlevel=dSupport;
+   if(dCurrent<dlevel)
+   {
+      return BreakZero(POSITION_TYPE_SELL);
+   }
+   dlevel=dResistance;
+   ///dlevel=dResistance+(iFrancisca*pips);
+   if(dlevel<dCurrent)
+   {
+      return BreakZero(POSITION_TYPE_BUY);
+   }
+   // Bien
+   return 1;
+}
+
+short BreakZero(ENUM_POSITION_TYPE TYPE_POS)
+{
+   ulong sZgravityStep;
+   int ipos=0;
+   // Coger el parÃ¡metro que ha seleccionado el usuario
+   sZgravityStep=GetGravityStep();
+      // Control de fecha
+   if(timeCurent<dWaitBreakZero)
+   {
+      vtext="Fecha actual es inferior a "+DoubleToString(dWaitBreakZero);
+      return 0;
+   }
+   // Check all Threads
+   for(int i=0;i<9;i++) // returns los posibles hilos
+   {
+      if(BreakZeroThread(i,sZgravityStep,TYPE_POS)<0) return -1;
+   }
+   // Bien
+   return 1;
+}
+
+short BreakZeroThread(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE TYPE_POS)
+{
+   ulong ticket;
+   ulong lstep;
+   ulong lNewstep;
+   string scomment;
+   double dLot=Lots*iCent;
+   double dNewLot=0.00;
+
+   // Coger el loteZero
+   lNewstep=sZgravityStep+1;
+   // Check all threads
+   for(int x=0;x<99;x++)
+   {
+      // Control si encuentra parar.
+      if(ATREND[iThread][x]==0)
+      {
+         x=99;
+      }
+      else
+      {
+         // Cargar el ticket Zero
+         ticket=ATREND[iThread][x];  
+         if(!cPos.SelectByTicket(ticket))
+         {
+            vtext="Error en BreakZeroThread seleccionado ticket "+IntegerToString(ticket)+". Ãltmo error encontrado:"+IntegerToString(GetLastError())+".No se evaluarÃ¡.";
+            ENUMTXT = PRINT;
+            expertLog();
+            return -1;
+         }
+         // Coger tipo de op
+         scomment=cPos.Comment();
+         lstep=GetStep(scomment); 
+         // No hacer nada mientras el hilo no se GZero
+         if(lstep<sZgravityStep) continue;
+
+         // Si llega aqui el hilo esta en GZero
+         // Dependiendo de la ruptura duplicar 1 u otro lote
+         if(TYPE_POS==POSITION_TYPE_SELL)
+         {
+            dNewLot=((dLOTBULL[iThread]*2)-dLOTBear[iThread]);
+            dNewLot=NormalizeDouble(dNewLot,lotdecimal);
+            // Control de 0 Lots. Si ya es doble en esa direcciÃ³n no hacer mÃ¡s ops
+            if(dNewLot<dLot) return 0;
+            vtext="Detectado rotura de soportes. Creando operaciÃ³n Bear:"+DoubleToString(dNewLot);
+            ENUMTXT = PRINT;
+            expertLog();      
+         }
+         else
+         { // New op tipo BULL
+            dNewLot=((dLOTBear[iThread]*2)-dLOTBULL[iThread]);
+            dNewLot=NormalizeDouble(dNewLot,lotdecimal);
+            // Control de 0 Lots.
+            if(dNewLot<dLot) return 0;
+            vtext="Detectado rotura de resistencias. Creando operaciÃ³n BULL."+DoubleToString(dNewLot);
+            ENUMTXT = PRINT;
+            expertLog();   
+         }
+         // Create new op to doble dir.
+        return CreateOpZero(TYPE_POS,dNewLot,lNewstep);
+      }
+   }
+   
+   // Bien
+   return 1;
+}
+// 
+
+// Nuevas operaciones ZeroGravity. Se le pasa el tipo,lote y step q se crearÃ¡
+short CreateOpZero(ENUM_POSITION_TYPE TYPE_POS,double dZeroLot,ulong sNewStep)
+{
+   ulong lstep=0;
+   ulong lMagic;
+   string scomment;
+   int iThread;
+   double dLot=Lots*iCent;
+   // Control 0 Lots.
+   if(dZeroLot<dLot) return 0;
+   // Tiene cargada la Ãºltima operaciÃ³n del hilo
+   scomment=cPos.Comment();
+   lstep=GetStep(scomment);
+   // Resetear comentario
+   StringReplace(scomment,": "+IntegerToString(lstep),": "+IntegerToString(sNewStep)); 
+   // Asignar el numero mÃ¡gico 
+   lMagic=cPos.Magic();
+   iThread=(int)(lMagic-MAGICTREND);
+   cTrade.SetExpertMagicNumber(lMagic); 
+   if(TYPE_POS==POSITION_TYPE_SELL)
+   {
+      // Crear Bear
+      if(!cTrade.Sell(dZeroLot,_Symbol,0,0,0,scomment))
+      {
+         vtext="CreateOpZero:Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operaciÃ³n de "+DoubleToString(dZeroLot)+".";
+         ENUMTXT = PRINT;
+         expertLog();
+         return -1;
+      }
+      
+   }
+   else
+   {
+      // Crear BULL
+      if(!cTrade.Buy(dZeroLot,_Symbol,0,0,0,scomment))
+      {
+         vtext="CreateOpZero:Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operaciÃ³n de "+DoubleToString(dZeroLot)+".";
+         ENUMTXT = PRINT;
+         expertLog();
+         return -1;
+      }  
+   }
+   vtext="CreateOpZero: se ha aÃ±adido nueva operaciÃ³n en hilo "+IntegerToString(iThread)+":"+DoubleToString(dZeroLot)+".";;
+   ENUMTXT = PRINT;
+   expertLog();    
+   // Bien
+   return 1;
+}
+
+// Recorrer las op del hilo.
+short SetLevelZeroThread(int iThread, ulong sZgravityStep)
+{
+   ulong ticket=0;
+   ulong lstep=0;
+   string scomment;
+   // Resetear Valor
+   dZeroPRICE[iThread]=0;
+   double dMidle=0;
+   ENUM_POSITION_TYPE TYPE_POS;
+   double dOpen;
+   
+   // Check all threads
+   for(int x=0;x<99;x++)
+   {
+      // Control si encuentra parar.
+      if(ATREND[iThread][x]==0)
+      {
+         // Si ha llegado hasta aquí, hilo en G0 sin op G0 poner G0 absoluto.
+         dMidle=(dMidle/x);
+         dZeroPRICE[iThread]=dMidle;
+         vtext="SetLevelZeroThread.Zona 0 absoluta.:"+DoubleToString(dZeroPRICE[iThread])+".No se han encontrado tiket Zero.";
+         ENUMTXT = PRINT;
+         expertLog();
+         x=99;
+      }
+      else
+      {
+         // Cargar el ticket Zero
+         ticket=ATREND[iThread][x];  
+         if(!cPos.SelectByTicket(ticket))
+         {
+            vtext="Error en SetLevelZeroThread seleccionado ticket "+IntegerToString(ticket)+". Último error encontrado:"+IntegerToString(GetLastError())+".No se evaluará.";
+            ENUMTXT = PRINT;
+            expertLog();
+            return -1;
+         }
+         // Coger tipo de op
+         dOpen=cPos.PriceOpen();
+         //Control de medio absoluto
+         dMidle+=dOpen;
+         TYPE_POS=cPos.PositionType();
+         scomment=cPos.Comment();
+         lstep=GetStep(scomment);
+         // Con primera G0 pintar zona.
+         if(TYPE_POS==POSITION_TYPE_SELL)
+         {
+            dZeroPRICE[iThread]=dOpen+(TakeProfit*pips);
+         }
+         else
+         { // Operaciones Zero BULL
+            dZeroPRICE[iThread]=dOpen-(TakeProfit*pips);
+         }
+         // Localizada G0 pintar y salir
+         if(lstep==sZgravityStep)
+         {
+            vtext="SetLevelZeroThread.Localizada Zona 0 de hilo:"+DoubleToString(dZeroPRICE[iThread])+".Ticket Zero:"+IntegerToString(ticket)+".";
+            ENUMTXT = PRINT;
+            expertLog();
+            return 1;
+         }
+         // Borrar TP de op antiguas.
+         // Si ha llegado aqui el hilo está en G0. Se pueden usar esas ops para sumar.
+         if(ClearTP()<0) return -1;
+      }
+   }
+   // Bien
+   return 1;
+}
+// Tengo la op cargada. Es G-1. Eliminar SL/TP si procede.
+short ClearTP()
+{
+   double dTP = 0.00;
+   ulong ticket=0;
+   // Check all ops
+   ticket=cPos.Ticket();
+   dTP=cPos.TakeProfit();
+   // Si no estÃ¡ en ganancias siguiente
+   if(dTP<=0) return 1;
+   // Si esta en beneficios el sl no tocar
+   if(bCheckSlProfit()== true) return 1;
+   // Actualizar Posicion
+   if(!cTrade.PositionModify(ticket,0,0))
+   {
+      vtext="Error al actualizar ClearTP en ticket "+IntegerToString(ticket)+" error:"+IntegerToString(GetLastError());
+      ENUMTXT = PRINT;
+      expertLog();
+      return -1;
+   }
+   vtext="ClearTP aplicado en ticket G-1 "+IntegerToString(ticket)+". TP desactivado.";
+   ENUMTXT = PRINT;
+   expertLog();
+   // Bien
+   return 1;
+}
+
+
+//              ------------------------------------------------------------------------------------------------------------------- //
+//              ----------------------------------------------- ZERO GRAVITY CODE ------------------------------------------------------ //
+//              ------------------------------------------------------------------------------------------------------------------- //
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// ---------------------------------------------- GREEN CODE --------------------------------------------------------- //
+// ------------------------------------------------------------------------------------------------------------------- //
+
+// Se le pasa el precio del proximo scalp y se ajusta para no estar en zonas cercanas a 0 0 a 50 pips.
+double GetGreenPrice(double dNewPrice,ENUM_POSITION_TYPE TYPE_POS)
+{
+   // Para la mayorÃ­a de pares de divisas 1 pip es 0.00001; para pares de divisas con el Yen JaponÃ©s como EUR/JPY 1 pip es 0.001
+   double dCalc=0;
+   double dPipsNew=0;
+   string sRighPips;
+   int iPips;
+   dCalc=dNewPrice;
+   sRighPips=DoubleToString(dNewPrice,5);
+   // Control puto YEN
+   if(pips==0.001)
+   {
+      sRighPips=DoubleToString(dNewPrice,3);
+   }
+   // Hacer siempre la posiciÃ³n mÃ¡s cercana a la operaciÃ³n a finalizar (ganar menos pero asegurar).
+   if(TYPE_POS==POSITION_TYPE_BUY)
+   {
+      dPipsNew=(iFrancisca*0.5*pips)*(-1);
+   }
+   else
+   {
+      dPipsNew=(iFrancisca*0.5*pips);
+   }
+   sRighPips=StringSubstr(sRighPips, StringLen(sRighPips)-2,2);
+   iPips=(int)sRighPips;
+   // Control de saltos
+   if((iPips>46 && iPips<54) || (iPips>95 || iPips<5))
+   {
+      // Sumar iFrancisca
+      dCalc=(dNewPrice+(dPipsNew));
+   }
+   // Bien
+   return dCalc;
+}
+
+
+
+//              ------------------------------------------------------------------------------------------------------------------- //
+//              ---------------------------------------------- GREEN CODE --------------------------------------------------------- //
+//              ------------------------------------------------------------------------------------------------------------------- //
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////// NEW DEVS
+
+///////////////////////////// DEPRECIDED FUNTIONS
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// ------------------------------------------- BREAKEVENT CODE ------------------------------------------------------- //
+// ------------------------------------------------------------------------------------------------------------------- //
+// Se le pasa el ticket original para marcar todas las coberturas de ese ticket
+short CheckBreakEventDownd()
+{
+   // Si no tiene SL es la superior guardarla para cuando se pueda.
+   ulong lTicketProc=0;
+   double ddiff = 0.00;
+   double dopen =  0.00;
+   double dprice = 0.00;
+   double DnewTP = 0.00;
+   ulong lstep=0;
+   ulong sZgravityStep;
+   // Coger el parámetro que ha seleccionado el usuario
+   sZgravityStep=GetGravityStep();
+   // Check all ops
+   for(int i=0;i<9;i++) // returns los posibles hilos
+   {
+      // Sólo si el hilo está activo, coger la op más baja
+      if(ATREND[i][0]<=0) continue;
+      if(!cPos.SelectByTicket(ATREND[i][0]))
+      {
+         Print("Error al seleccionar orden. Error = ",GetLastError());
+         return -1;
+      }
+      lTicketProc=cPos.Ticket();
+      // Si no está en ganancias siguiente
+      if(cPos.Profit()<0) continue;
+      // Si esta en beneficios el sl no tocar
+      if(bCheckSlProfit()== true) continue;
+      lstep=GetStep(cPos.Comment());
+      // Control es Gz. G-1 se considera el inicio del hilo
+      if(lstep>=sZgravityStep-1) continue;
+      dopen=cPos.PriceOpen();
+      dprice=cPos.PriceCurrent();
+      // Controlar posición en ganancias
+      ddiff=MathAbs(dopen-dprice);
+      if(ddiff<((TakeProfit*1.5)*pips)) continue;
+      // Cerrar op
+      if(!cTrade.PositionClose(lTicketProc))
+      {
+         vtext="Error en CheckBreakEventDown cerrar el ticket "+IntegerToString(lTicketProc)+" error:"+IntegerToString(GetLastError());
+         ENUMTXT = PRINT;
+         expertLog();
+         return -1;
+      }
+      //BreakEvent realizado.
+      vtext="CheckBreakEventDown aplicado en ticket "+IntegerToString(lTicketProc)+". Se ha cerrado operación.";
+      ENUMTXT = PRINT;
+      expertLog();
+   }
+   // Bien
+   return 1;
+}
+
+
+//              ------------------------------------------------------------------------------------------------------------------- //
+//              ------------------------------------------- BREAKEVENT CODE ------------------------------------------------------- //
+//              ------------------------------------------------------------------------------------------------------------------- //
+
+
+
+
+double GetSLStepd(ulong lstep,int ithread,datetime doldopen, ENUM_POSITION_TYPE TPOS)
+{
+   double dPrice=0;
+   double dPips=0;
+   double dTP=0;
+   double dNewSL=0;
+   // Obtener el precio
+   dPrice=cPos.PriceOpen();
+   dTP=cPos.TakeProfit();
+   dPips=MathAbs(dPrice-dTP);
+   //dPips+=(TakeProfit*0.5*pips); 
+   dPips+=(iFrancisca*pips); 
+   // Descontar los pips que se aÃ±adieron por la comision de apertura
+   dPips-=(iComisionPips*pips);
+   // Descontar la ganacia para operaciones > 1
+   if(lstep<1)
+   {
+      // Calcular el SL dependiendo de la operaciÃ³n.
+      if(TPOS==POSITION_TYPE_SELL)
+      { 
+         dNewSL=NormalizeDouble(dPrice+dPips,Digits());
+      }
+      // PosiciÃ³n de compras. Meter sl negativo
+      else
+      {
+         dNewSL=NormalizeDouble(dPrice-dPips,Digits());
+      }
+   }
+   // Calcular precio por historico de barras de hilo
+   else
+   {
+      dNewSL=GetBarPiecesThread(doldopen,TPOS);
+   }
+   // Bien
+   return dNewSL;
+}
+
+
+short GetPricesThread(int ithread)
+{
+   double dOpen=0;
+   // INIT VALUES
+   dLPRICE[ithread]=0;
+   dHPRICE[ithread]=0;
+   // Recorrer operaciones de hilo
+   ulong ticket=0;
+   dLPRICE[ithread]=-100;
+   double dMinOp=1000; 
+   dHPRICE[ithread]=1000;
+   double dMaxOp=0;
+   // El proceso siempre retorna el array de menor a mayor ticket
+   for(int x=0;x<99;x++)
+   {
+      // Control si encuentra parar.
+      if(ATREND[ithread][x]>0)
+      {
+         ticket=ATREND[ithread][x];
+         // Cargar la posiciÃ³n
+         if(!cPos.SelectByTicket(ticket))
+         {
+            vtext="GetPricesThread: No se ha podido cargar ticket "+IntegerToString(ticket);
+            ENUMTXT = PRINT;
+            expertLog(); 
+            return -1;
+         }
+         // Get dOPEN
+         dOpen=cPos.PriceOpen();
+         // Cargar max/min
+         if(dMinOp>dOpen) dMinOp=dOpen;
+         if(dMaxOp<dOpen) dMaxOp=dOpen;
+         // Control de precios. Coger los precios mÃ¡s pequeÃ±os en cada lado.
+         if(cPos.PositionType()==POSITION_TYPE_SELL)
+         { // Bear OPS
+            if(dLPRICE[ithread]< dOpen) dLPRICE[ithread]=dOpen; 
+         }
+         else
+         {  // BULL OPS
+            if(dHPRICE[ithread] > dOpen) dHPRICE[ithread]=dOpen; 
+         }    
+      }
+      else
+      {
+         // Exist for
+         x=99;
+      }
+   }
+   // Bien
+   return 1;
+}
+short CheckHighBreakd(double dNewLot)
+{
+   double dHighLot = (Lots * iCent *50);
+   datetime dAhora=TimeCurrent();
+   MqlDateTime strdate;
+   TimeToStruct(dAhora,strdate);
+   // Si es lote bajo dejar abrir
+   if (dNewLot<dHighLot) return 1;
+   // Si es jueves o viernes esperar a apertura Wall Street
+   ///////////////////////////////////////////////if (strdate.day_of_week < 4 ) return 0;
+   // // Wall Street open 15:30
+   if(strdate.hour>14 && strdate.min > 30) 
+   {
+      vtext="Apertura Wall Street confirmada.BreakZero activada.";
+      ENUMTXT = PRINT;
+      expertLog();
+      return 1; 
+   }
+   // Por defecto no puede abrir
+   return 0;
+}
+
+
 
 short EqualZeroThread(int ithread,ulong sZgravityStep)
 {
