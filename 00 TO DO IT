@@ -1,10 +1,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // VERSION 8.30
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-- EqualityZero: Sólo Creará una operación Zero.
-- BreakZero: Generará OP G1.
-- SL: - Pequeñas. 3TP 2iFranciscas. Confirmar si es buena opción.
-      - ZeroOps only. Sólo pondrá SL en las operaciones Zero.
+- EqualityZero: Sólo Creará una operación Zero. <-- OK
+- BreakZero: Generará OP G1. <-- OK
+- SL: ZeroOps only. Sólo pondrá SL en las operaciones Zero. <-- OK
+
+EQUALZERO genera operaciones por encima/debajo de Gzerozone.
 
 
 
