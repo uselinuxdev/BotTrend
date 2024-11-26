@@ -1,4 +1,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// VERSION 8.30
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+- EqualityZero: Sólo Creará una operación Zero.
+- BreakZero: Generará OP G1.
+- SL: - Pequeñas. 3TP 2iFranciscas. Confirmar si es buena opción.
+      - ZeroOps only. Sólo pondrá SL en las operaciones Zero.
+
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // VERSION 8.25
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	
@@ -25,12 +36,12 @@
 - Función BreakZoneZero: Cuando se defina se carge G0, resetear niveles con soporte. <-- OK
 	- Sólo leer las últimas 24h de barras en ese momento. <-- OK
 
-- SL Function: Cada minuto. Independicar función de GZero.
-	- Operaciones normales:2TP/2ifrancisca.
-	- Operaciones Zero+1: 3.5TP/2iFrancisca.
-	- Poner valor de operación en esa dirección en SL +- 1TP, en el next de esa dir. Pintar limites hilo en log experto.
-	- Si vuelve a operación contraria en positivo. Resetear Next contrario. Usará los límites diarios standar.
-	- Al crear nueva G1 resetear valor NextBear/NextBULL SL funcition.
+- SL Function: Cada minuto. Independicar función de GZero.  <-- OK
+	- Operaciones normales:2TP/2ifrancisca.  <-- OK
+	- Operaciones Zero+1: 3.5TP/2iFrancisca.  <-- OK
+	- Poner valor de operación en esa dirección en SL +- 1TP, en el next de esa dir. Pintar limites hilo en log experto.  <-- OK
+	- Si vuelve a operación contraria en positivo. Resetear Next contrario. Usará los límites diarios standar.  <-- OK
+	- Al crear nueva G1 resetear valor NextBear/NextBULL SL funcition. <-- OK
 
 - Función CloseThisThread pinta continuamente se da en hilos pequeños. 
 	- En hilo standar cerrar 1/2 ganancia defecto.
