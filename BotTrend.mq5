@@ -245,6 +245,8 @@ void OnTick()
       // Coger niveles diarios plus operaciones. 
       // Cada 5 minutos. Soportes / Resistencias por hilo. Diario o por SL G1
       if(GetLevels()<0) return;
+      // Grabar SL
+      if(CheckStopLost()<0) return;
       // Actualiza panel 
       RefressPanel();
    }
@@ -567,28 +569,29 @@ short GetLevels()
    for(int i=0;i<9;i++)
    {
       // Sólo si el hilo tiene ops
-      if((dZeroPRICE[i]>0) && (dLPRICE[i])==0)
+      if(dZeroPRICE[i]>0)
       {
-         return GetLevelsThread(i,sZgravityStep);
+         if (dLPRICE[i]==0)
+         {
+            // Se definirá el nivel la primera vez. Con las barras de 24h.
+            return SetZeroLevelThread(i);
+         }
+         else
+         {
+            return UpdateZeroLevelThread(i,sZgravityStep);
+         }
       }
    }
    return 1;
 }
 
-
-// Se incluyen las operaciones activas
-short GetLevelsThread(int iThread,ulong sZgravityStep)
+// Coger niveles de 24h
+short SetZeroLevelThread(int iThread)
 {
    MqlRates rLastBars[];
-   ulong ticket=0;
-   ulong lmagic=0;
-   ulong lstep=0;
-   string scomment;
    // Hacerlo con 5min (12(60/5) * 24h)
    //int iPeriodos=24;
    int iPeriodos=288;
-   double dPriceOp=0;
-   double dSL=0;
    SymbolInfo.Name(_Symbol);
    SymbolInfo.Refresh();
    SymbolInfo.RefreshRates();
@@ -609,17 +612,34 @@ short GetLevelsThread(int iThread,ulong sZgravityStep)
       if(rLastBars[i].low<dLPRICE[iThread]) dLPRICE[iThread]=rLastBars[i].low; 
       if(rLastBars[i].high>dHPRICE[iThread]) dHPRICE[iThread]=rLastBars[i].high; 
    }
-   //// TEST sÃ³lo limites diarios
-  ////////////// return 1;
-   // Ahora comprobaremos el Max/Min de las operaciones y su SL
-   // Sólo las operaciones G1
+   vtext="SetZeroLevelThread:Limites iniciales:Soporte:"+DoubleToString(dLPRICE[iThread])+".Resistencia:"+DoubleToString(dHPRICE[iThread])+".";
+   ENUMTXT = PRINT;
+   expertLog(); 
+   // Bien
+   return 1;
+}
+// Cada min comprobará si el nivel del hilo se tiene que actualizar con las operaciones G2 (Breakops)
+short UpdateZeroLevelThread(int iThread,ulong sZgravityStep)
+{
+   ulong ticket=0;
+   ulong lmagic=0;
+   ulong lstep=0;
+   bool bupated=false;
+   string scomment;
+   double dPriceOp=0;
+   double dSL=0;
+   double dNewLevel=0;
+   // Sólo las operaciones G2
    for(int i=0;i<99;i++) // returns the number of current positions
    {
       if(ATREND[iThread][i]==0) 
       {
-         vtext="GetLevelsThread: Soporte de hilo:"+DoubleToString(dLPRICE[iThread])+".Resistencia de hilo:"+DoubleToString(dHPRICE[iThread])+".";
-         ENUMTXT = PRINT;
-         expertLog(); 
+         if(bupated)
+         {
+            vtext="GetLevelsThread: Soporte de hilo:"+DoubleToString(dLPRICE[iThread])+".Resistencia de hilo:"+DoubleToString(dHPRICE[iThread])+".";
+            ENUMTXT = PRINT;
+            expertLog(); 
+         }
          return 1;
       }
       if(!cPos.SelectByTicket(ATREND[iThread][i]))
@@ -638,23 +658,43 @@ short GetLevelsThread(int iThread,ulong sZgravityStep)
       }
       // Si sigue sin comentario correcto poner comentario default
       lstep=GetStep(scomment);
-      // Comprobar sólo G1 ops.
-      if(lstep>sZgravityStep)
+      // Comprobar sólo G2 ops.
+      if(lstep>(sZgravityStep+1))
       {
          ticket=cPos.Ticket();
          dPriceOp=cPos.PriceOpen();
          dSL=cPos.StopLoss();
+         if(dPriceOp<dLPRICE[iThread]) 
+         {
+            dLPRICE[iThread]=dPriceOp; 
+            bupated=true;
+         }
+         if(dPriceOp>dHPRICE[iThread]) 
+         {
+            dHPRICE[iThread]=dPriceOp;
+            bupated=true;
+         } 
          // Si tiene SL será SL+-TP
          if(dSL>0)
          {
             // Seleccionar deal
             if(cPos.PositionType()==POSITION_TYPE_SELL)
             {
-                dLPRICE[iThread]=(dSL-(TakeProfit*pips));
+               dNewLevel=(dSL-(TakeProfit*pips));
+               if(dLPRICE[iThread]!=dNewLevel)
+               {
+                  dLPRICE[iThread]=(dSL-(TakeProfit*pips));
+                  bupated=true;
+               }
             }
             else
             {
-               dHPRICE[iThread]=(dSL+(TakeProfit*pips));
+               dNewLevel=(dSL+(TakeProfit*pips));
+               if(dHPRICE[iThread]!=dNewLevel)
+               {
+                  dHPRICE[iThread]=(dSL+(TakeProfit*pips));
+                  bupated=true;
+               }
             }
          }
       }
@@ -1139,6 +1179,96 @@ short CloseThisThread(int ithread)
    return 1;
 }
 
+
+short CheckStopLost()
+{
+   ulong sZgravityStep;
+   int ipos=0;
+   // Coger el parámetro que ha seleccionado el usuario
+   sZgravityStep=GetGravityStep();
+   // Check all Threads
+   for(int i=0;i<9;i++) // returns los posibles hilos
+   {
+      if(SetStopLostThread(i,sZgravityStep)<0) return -1;
+   }
+   // Bien
+   return 1;
+}
+// Recorrer las op del hilo. Pequeñas 2TP/2Fran. Grandes 4TP/2Fran
+short SetStopLostThread(int iThread, ulong sZgravityStep)
+{
+   ulong ticket=0;
+   ulong lstep=0;
+   string scomment;
+   ENUM_POSITION_TYPE TYPE_POS;
+   double dNewSL,dOpen,dCurrent,ddiff=0.00;
+
+   // Check all threads
+   for(int x=0;x<99;x++)
+   {
+      // Control si encuentra parar.
+      if(ATREND[iThread][x]==0)
+      {
+         x=99;
+      }
+      else
+      {
+         // Cargar el ticket Zero
+         ticket=ATREND[iThread][x];  
+         if(!cPos.SelectByTicket(ticket))
+         {
+            vtext="Error en SetStopLostThread seleccionado ticket "+IntegerToString(ticket)+". Último error encontrado:"+IntegerToString(GetLastError())+".No se evaluará.";
+            ENUMTXT = PRINT;
+            expertLog();
+            return -1;
+         }
+         // Coger tipo de op
+         scomment=cPos.Comment();
+         lstep=GetStep(scomment); 
+         TYPE_POS=cPos.PositionType();
+         if(cPos.Profit()<0) continue;
+         dNewSL=cPos.StopLoss();
+         // Si tiene sl siguiente
+         if(dNewSL>0) continue;
+         // Control de SL
+         dOpen=cPos.PriceOpen();
+         dCurrent=cPos.PriceCurrent();
+         ddiff=MathAbs(dOpen-dCurrent);
+         // No poner SL en operaciones Zero
+         if(lstep==sZgravityStep) continue;
+         // No poner SL en la G2
+         if(lstep==sZgravityStep+2) continue;
+         // Operaciones pequeñas 2TP / 2Ifranciscas
+         if((lstep<sZgravityStep) && (ddiff<(3*TakeProfit*pips))) continue;
+         // Operaciones G2 4TP / 2Ifranciscas
+         if((lstep>sZgravityStep) && (ddiff<(4*TakeProfit*pips))) continue;
+         // Control de hilo en esa dir.
+         if(TYPE_POS==POSITION_TYPE_SELL)
+         {
+            dNewSL=dOpen-(2*iFrancisca*pips);
+         }
+         if(TYPE_POS==POSITION_TYPE_BUY)
+         {
+            dNewSL=dOpen+(2*iFrancisca*pips);
+         }
+         if(dNewSL>0)
+         { // Actualiza SL
+            if(!cTrade.PositionModify(ticket,dNewSL,0))
+            {
+               vtext="Error en función SetStopLostThread al actualizar niveles en ticket "+IntegerToString(ticket)+" error:"+IntegerToString(GetLastError());
+               ENUMTXT = PRINT;
+               expertLog();
+               return -1;
+            }
+            vtext="SetStopLostThread actualizó niveles en ticket "+IntegerToString(ticket)+" Nuevo SL:"+DoubleToString(dNewSL);
+            ENUMTXT = PRINT;
+            expertLog();
+         } 
+      }
+   }
+   // Bien
+   return 1;
+}
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1990,8 +2120,8 @@ short BreakZeroThread(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE TYPE_PO
    double dLot=Lots*iCent;
    double dNewLot=0.00;
 
-   // Coger el loteZero
-   lNewstep=sZgravityStep+1;
+   // Step final Zero +2
+   lNewstep=sZgravityStep+2;
    // Check all threads
    for(int x=0;x<99;x++)
    {
@@ -2006,7 +2136,7 @@ short BreakZeroThread(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE TYPE_PO
          ticket=ATREND[iThread][x];  
          if(!cPos.SelectByTicket(ticket))
          {
-            vtext="Error en BreakZeroThread seleccionado ticket "+IntegerToString(ticket)+". Ãltmo error encontrado:"+IntegerToString(GetLastError())+".No se evaluarÃ¡.";
+            vtext="Error en BreakZeroThread seleccionado ticket "+IntegerToString(ticket)+". Último error encontrado:"+IntegerToString(GetLastError())+".No se evaluarÃ¡.";
             ENUMTXT = PRINT;
             expertLog();
             return -1;
@@ -2025,7 +2155,7 @@ short BreakZeroThread(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE TYPE_PO
             dNewLot=NormalizeDouble(dNewLot,lotdecimal);
             // Control de 0 Lots. Si ya es doble en esa direcciÃ³n no hacer mÃ¡s ops
             if(dNewLot<dLot) return 0;
-            vtext="Detectado rotura de soportes. Creando operaciÃ³n Bear:"+DoubleToString(dNewLot);
+            vtext="Detectado rotura de soportes. Creando operación Bear:"+DoubleToString(dNewLot);
             ENUMTXT = PRINT;
             expertLog();      
          }
@@ -2035,7 +2165,7 @@ short BreakZeroThread(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE TYPE_PO
             dNewLot=NormalizeDouble(dNewLot,lotdecimal);
             // Control de 0 Lots.
             if(dNewLot<dLot) return 0;
-            vtext="Detectado rotura de resistencias. Creando operaciÃ³n BULL."+DoubleToString(dNewLot);
+            vtext="Detectado rotura de resistencias. Creando operación BULL."+DoubleToString(dNewLot);
             ENUMTXT = PRINT;
             expertLog();   
          }
@@ -2073,7 +2203,7 @@ short CreateOpZero(ENUM_POSITION_TYPE TYPE_POS,double dZeroLot,ulong sNewStep)
       // Crear Bear
       if(!cTrade.Sell(dZeroLot,_Symbol,0,0,0,scomment))
       {
-         vtext="CreateOpZero:Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operaciÃ³n de "+DoubleToString(dZeroLot)+".";
+         vtext="CreateOpZero:Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operacón de "+DoubleToString(dZeroLot)+".";
          ENUMTXT = PRINT;
          expertLog();
          return -1;
@@ -2085,13 +2215,13 @@ short CreateOpZero(ENUM_POSITION_TYPE TYPE_POS,double dZeroLot,ulong sNewStep)
       // Crear BULL
       if(!cTrade.Buy(dZeroLot,_Symbol,0,0,0,scomment))
       {
-         vtext="CreateOpZero:Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operaciÃ³n de "+DoubleToString(dZeroLot)+".";
+         vtext="CreateOpZero:Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operación de "+DoubleToString(dZeroLot)+".";
          ENUMTXT = PRINT;
          expertLog();
          return -1;
       }  
    }
-   vtext="CreateOpZero: se ha aÃ±adido nueva operaciÃ³n en hilo "+IntegerToString(iThread)+":"+DoubleToString(dZeroLot)+".";;
+   vtext="CreateOpZero: se ha añadido nueva operación en hilo "+IntegerToString(iThread)+":"+DoubleToString(dZeroLot)+".";;
    ENUMTXT = PRINT;
    expertLog();    
    // Bien
