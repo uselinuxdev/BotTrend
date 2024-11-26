@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2020, Usefilm Corp."
 #property link      "https://www.mql5.com"
-#define VERSION "8.25"
+#define VERSION "8.30"
 #property version VERSION
 
 // InclusiÃ³n de objetos de liberia estandar
@@ -627,7 +627,6 @@ short UpdateZeroLevelThread(int iThread,ulong sZgravityStep)
    bool bupated=false;
    string scomment;
    double dPriceOp=0;
-   double dSL=0;
    double dNewLevel=0;
    // Sólo las operaciones G2
    for(int i=0;i<99;i++) // returns the number of current positions
@@ -658,12 +657,11 @@ short UpdateZeroLevelThread(int iThread,ulong sZgravityStep)
       }
       // Si sigue sin comentario correcto poner comentario default
       lstep=GetStep(scomment);
-      // Comprobar sólo G2 ops.
-      if(lstep>(sZgravityStep+1))
+      // Comprobar sólo G1 ops.
+      if(lstep>(sZgravityStep))
       {
          ticket=cPos.Ticket();
          dPriceOp=cPos.PriceOpen();
-         dSL=cPos.StopLoss();
          if(dPriceOp<dLPRICE[iThread]) 
          {
             dLPRICE[iThread]=dPriceOp; 
@@ -674,29 +672,6 @@ short UpdateZeroLevelThread(int iThread,ulong sZgravityStep)
             dHPRICE[iThread]=dPriceOp;
             bupated=true;
          } 
-         // Si tiene SL será SL+-TP
-         if(dSL>0)
-         {
-            // Seleccionar deal
-            if(cPos.PositionType()==POSITION_TYPE_SELL)
-            {
-               dNewLevel=(dSL-(TakeProfit*pips));
-               if(dLPRICE[iThread]!=dNewLevel)
-               {
-                  dLPRICE[iThread]=(dSL-(TakeProfit*pips));
-                  bupated=true;
-               }
-            }
-            else
-            {
-               dNewLevel=(dSL+(TakeProfit*pips));
-               if(dHPRICE[iThread]!=dNewLevel)
-               {
-                  dHPRICE[iThread]=(dSL+(TakeProfit*pips));
-                  bupated=true;
-               }
-            }
-         }
       }
    } 
    // Bien
@@ -1234,22 +1209,18 @@ short SetStopLostThread(int iThread, ulong sZgravityStep)
          dOpen=cPos.PriceOpen();
          dCurrent=cPos.PriceCurrent();
          ddiff=MathAbs(dOpen-dCurrent);
-         // No poner SL en operaciones Zero
-         if(lstep==sZgravityStep) continue;
-         // No poner SL en la G2
-         if(lstep==sZgravityStep+2) continue;
-         // Operaciones pequeñas 2TP / 2Ifranciscas
-         if((lstep<sZgravityStep) && (ddiff<(3*TakeProfit*pips))) continue;
+         // Sólo poner SL en operaciones G0
+         if(lstep!=sZgravityStep) continue;
          // Operaciones G2 4TP / 2Ifranciscas
-         if((lstep>sZgravityStep) && (ddiff<(4*TakeProfit*pips))) continue;
+         if(ddiff<(4*TakeProfit*pips)) continue;
          // Control de hilo en esa dir.
          if(TYPE_POS==POSITION_TYPE_SELL)
          {
-            dNewSL=dOpen-(2*iFrancisca*pips);
+            dNewSL=dOpen-(TakeProfit*pips);
          }
          if(TYPE_POS==POSITION_TYPE_BUY)
          {
-            dNewSL=dOpen+(2*iFrancisca*pips);
+            dNewSL=dOpen+(TakeProfit*pips);
          }
          if(dNewSL>0)
          { // Actualiza SL
@@ -2011,37 +1982,16 @@ short EqualZeroThread(int ithread,ulong sZgravityStep)
             TYPE_Break=POSITION_TYPE_SELL;
             dNewLot=(dLOTBULL[ithread]-dLOTBear[ithread]);
             dNewLot=NormalizeDouble(dNewLot,lotdecimal);
-            if(dNewLot>dLot)
-            {
-               if(CreateOpZero(TYPE_Break,dLot,sZgravityStep)<0) return -1;
-               dNewLot-=dLot;
-               dNewLot=NormalizeDouble(dNewLot,lotdecimal);
-               return CreateOpZero(TYPE_Break,dNewLot,sZgravityStep+1);
-            }
-            else
-            {
-               return CreateOpZero(TYPE_Break,dNewLot,sZgravityStep);
-            }
-
+            return CreateOpZero(TYPE_Break,dNewLot,sZgravityStep);
          }
          // Con el ZeroZone +- 1TP
          dZeroTypePrice=dZeroPRICE[ithread]+(TakeProfit*pips);
-         if((dCurrentPrice>dHPRICE[ithread]) && (dLOTBULL[ithread] < dLOTBear[ithread]))
+         if((dCurrentPrice>dZeroTypePrice) && (dLOTBULL[ithread] < dLOTBear[ithread]))
          {
             TYPE_Break=POSITION_TYPE_BUY;
             dNewLot=(dLOTBear[ithread]-dLOTBULL[ithread]);
             dNewLot=NormalizeDouble(dNewLot,lotdecimal);
-            if(dNewLot>dLot)
-            {
-               if(CreateOpZero(TYPE_Break,dLot,sZgravityStep)<0) return -1;
-               dNewLot-=dLot;
-               dNewLot=NormalizeDouble(dNewLot,lotdecimal);
-               return CreateOpZero(TYPE_Break,dNewLot,sZgravityStep+1);
-            }
-            else
-            {
-               return CreateOpZero(TYPE_Break,dNewLot,sZgravityStep);
-            }           
+            return CreateOpZero(TYPE_Break,dNewLot,sZgravityStep);       
          }
          return 1;
       }
@@ -2120,8 +2070,8 @@ short BreakZeroThread(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE TYPE_PO
    double dLot=Lots*iCent;
    double dNewLot=0.00;
 
-   // Step final Zero +2
-   lNewstep=sZgravityStep+2;
+   // Step final Zero +1
+   lNewstep=sZgravityStep+1;
    // Check all threads
    for(int x=0;x<99;x++)
    {
@@ -2284,6 +2234,9 @@ short SetLevelZeroThread(int iThread, ulong sZgravityStep)
          { // Operaciones Zero BULL
             dZeroPRICE[iThread]=dOpen-(TakeProfit*pips);
          }
+         // Borrar TP de op antiguas.
+         // Si ha llegado aqui el hilo está en G0. Se pueden usar esas ops para sumar.
+         if(ClearTP()<0) return -1;
          // Localizada G0 pintar y salir
          if(lstep==sZgravityStep)
          {
@@ -2295,9 +2248,6 @@ short SetLevelZeroThread(int iThread, ulong sZgravityStep)
             expertLog();
             return 1;
          }
-         // Borrar TP de op antiguas.
-         // Si ha llegado aqui el hilo está en G0. Se pueden usar esas ops para sumar.
-         if(ClearTP()<0) return -1;
       }
    }
    // Bien
