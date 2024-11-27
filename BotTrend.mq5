@@ -721,22 +721,6 @@ bool CheckOpenMarket()
    return bOpenMarket;
 }
 
-// Hasta GZero se duplica luego aÃÂ±adir un Lots por step
-double GetLotStep(ulong lstep)
-{
-   double dLot=0.00;
-   ulong sZgravity;
-   // Coger el parÃÂ¡metro que ha seleccionado el usuario
-   sZgravity=GetGravityStep();
-   dLot=Lots*iCent;
-   for(ulong i=1;i<sZgravity;i++)
-   {
-      dLot=(dLot*2)+(Lots*iCent);
-   }
-   // Bien
-   return NormalizeDouble(dLot,lotdecimal);
-}
-
 // La funcion retorna si el NÃÂº mÃÂ¡gico es de los del bot.2 Si es un TBOT
 short IsMyMagic(long lMagicCheck)
 {
@@ -1690,7 +1674,6 @@ double NewStep(double dTP,ulong lstep,ulong sZgravity,string scoment,ENUM_POSITI
    // Control ZGravity
    if((lstep>=sZgravity))
    {
-      LotStep=GetLotStep(lstep);
       // Gravedad 0
       vtext="NewStep: Lote en gravedad 0 calculado: "+DoubleToString(LotStep)+".";
       // Resetar comentario a op. maxima normal de ZeroGravity
