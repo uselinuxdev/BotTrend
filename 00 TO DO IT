@@ -4,6 +4,7 @@
 - EqualityZero: Sólo Creará una operación Zero. <-- OK
 - BreakZero: Generará OP G1. <-- OK
 - SL: ZeroOps only. Sólo pondrá SL en las operaciones Zero. <-- OK
+- NextStep G0 duplica lote. <-- OK
 
 EQUALZERO genera operaciones por encima/debajo de Gzerozone.
 
