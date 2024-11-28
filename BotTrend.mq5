@@ -1667,6 +1667,7 @@ double NewStep(double dTP,ulong lstep,ulong sZgravity,string scoment,ENUM_POSITI
 {
    double LotStep=0.0;
    double LotOrig=0.00;
+   ulong lThread=0;
    
    // TamaÃÂ±o del lote
    LotOrig=cPos.Volume();
@@ -1675,7 +1676,12 @@ double NewStep(double dTP,ulong lstep,ulong sZgravity,string scoment,ENUM_POSITI
    if((lstep>=sZgravity))
    {
       // Gravedad 0
-      vtext="NewStep: Lote en gravedad 0 calculado: "+DoubleToString(LotStep)+".";
+      vtext="NewStep: Lote en gravedad 0 calculado: "+DoubleToString(LotStep)+".Reseting Zero Zone.";
+      lThread=lMagic-MAGICTREND;
+      // Reset ZoneZero
+      dZeroPRICE[lThread]=0;
+      dLPRICE[lThread]=0;
+      dHPRICE[lThread]=0;
       // Resetar comentario a op. maxima normal de ZeroGravity
       StringReplace(scoment,": "+IntegerToString(lstep),": "+IntegerToString(sZgravity)); 
    }
@@ -2005,6 +2011,7 @@ short EqualZeroThread(int ithread,ulong sZgravityStep)
             if(dZeroPRICE[ithread]<=0) 
             {
                if(SetLevelZeroThread(ithread,sZgravityStep)<0) return -1;
+               if(GetLevels()<0) return -1;
             }
             bZero=true;
          }
