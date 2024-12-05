@@ -1,12 +1,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// VERSION 8.35
+// VERSION 8.40
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+- Inicio GZero. Coger MAX/Min 24h.
+	- ZeroBear: Min + 1TP.
+	- ZeroBull: Max - 1TP.
+- BreakZero:
+	- BreakBear: ZeroBear - 1TP - 1 iFrancisca.
+	- BreakBull: ZeroBUL + 1TP + 1 iFrancisca.
 - Reinicio de bot con hilo abierto:
 	- Hilo no Zero. Coger Edge: Limites TP-Precio-SL(TP desde ini en negativo).
-	- Hilos Zero. Coger valores de OPEN de Bear / Bull como límites +- 2iFranciscas.
-- BreakZero. Una vez definido el límite de hilo siempre en el mismo punto de soporte/resistencia. 
+	- Hilos Zero. Coger Operación Zero. Llamar a la función de 24h de esa operacion.
 - SL Operaciones G1 4TP 2iFranciscas. Subir Limite hilo = SL aplicado + TP.
-	- Si hay SL G1 poner SL de G0 también.
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // VERSION 8.30
