@@ -6,6 +6,7 @@
 	- Hilos Zero. Coger valores de OPEN de Bear / Bull como límites +- 2iFranciscas.
 - BreakZero. Una vez definido el límite de hilo siempre en el mismo punto de soporte/resistencia. 
 - SL Operaciones G1 4TP 2iFranciscas. Subir Limite hilo = SL aplicado + TP.
+	- Si hay SL G1 poner SL de G0 también.
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // VERSION 8.30
