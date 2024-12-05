@@ -4,10 +4,8 @@
 - Reinicio de bot con hilo abierto:
 	- Hilo no Zero. Coger Edge: Limites TP-Precio-SL(TP desde ini en negativo).
 	- Hilos Zero. Coger valores de OPEN de Bear / Bull como límites +- 2iFranciscas.
-- Apertura de operaciones G0 sin esperar a apertura de mercado.
 - BreakZero. Una vez definido el límite de hilo siempre en el mismo punto de soporte/resistencia. 
-- BreakZero. Set SL de las OP Zero de ese hilo.
-- SL Operaciones G1 4TP 2iFranciscas. Subir Limite hilo.
+- SL Operaciones G1 4TP 2iFranciscas. Subir Limite hilo = SL aplicado + TP.
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // VERSION 8.30
