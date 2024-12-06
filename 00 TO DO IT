@@ -3,6 +3,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 - Primera G0. No doblar lote.  <-- OK
 - Resetear niveles de operaciones pequeñas.   <-- OK
+- Mucho mas estable sin SL.  <-- OK
 - Inicio GZero. Coger MAX/Min 24h.
 	- ZeroBear: Min + 1TP.
 	- ZeroBull: Max - 1TP.
