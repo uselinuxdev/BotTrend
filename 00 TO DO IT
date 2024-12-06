@@ -2,7 +2,7 @@
 // VERSION 8.40
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 - Primera G0. No doblar lote.  <-- OK
-- No resetear niveles de operaciones pequeñas.   <-- OK
+- Resetear niveles de operaciones pequeñas.   <-- OK
 - Inicio GZero. Coger MAX/Min 24h.
 	- ZeroBear: Min + 1TP.
 	- ZeroBull: Max - 1TP.
