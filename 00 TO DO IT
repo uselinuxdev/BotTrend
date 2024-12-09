@@ -2,7 +2,7 @@
 // VERSION 8.40
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 - Primera G0. No doblar lote.  <-- OK
-- Resetear niveles de operaciones pequeñas.   <-- OK
+- Hilo Zero Empieza en G-1. Ahí se define Zonas de soporte/resistencia 24h.
 - Poner SL a las G0 Si esta para ese lado.
 - Inicio GZero. Coger MAX/Min 24h.
 	- ZeroBear: Min + 1TP.
