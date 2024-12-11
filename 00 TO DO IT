@@ -1,15 +1,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// VERSION 8.45
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+- ZonaZero:
+	- Soporte -3 TP.
+	- Resistencia + 3TP.
+- BreakZero:
+	- Soporte 2 + Franciscas.
+	- Resistenca + 2 Franciscas.
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // VERSION 8.40
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 - Primera G0. No doblar lote.  <-- OK
-- Hilo Zero Empieza en G-1. Ahí se define Zonas de soporte/resistencia 24h.
-- Poner SL a las G0 Si esta para ese lado.
-- Inicio GZero. Coger MAX/Min 24h.
-	- ZeroBear: Min + 1TP.
-	- ZeroBull: Max - 1TP.
+- Hilo Zero Empieza en G-1. Ahí se define Zonas de soporte/resistencia 24h. <-- OK
+- Poner SL a las G0 Si esta para ese lado. <-- OK
+- Inicio GZero. Coger MAX/Min 24h. <-- OK
+	- ZeroBear: Min + 1TP. <-- OK
+	- ZeroBull: Max - 1TP. <-- OK
 - BreakZero:
-	- BreakBear: ZeroBear - 1TP - 1 iFrancisca.
-	- BreakBull: ZeroBUL + 1TP + 1 iFrancisca.
+	- BreakBear: ZeroBear - 1TP - 1 iFrancisca. <-- OK
+	- BreakBull: ZeroBUL + 1TP + 1 iFrancisca. <-- OK
 - Reinicio de bot con hilo abierto:
 	- Hilo no Zero. Coger Edge: Limites TP-Precio-SL(TP desde ini en negativo). <-- OK probar linea 446
 	- Hilos Zero. Coger Operación Zero. Llamar a la función de 24h de esa operacion. <-- OK
