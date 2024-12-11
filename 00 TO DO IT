@@ -2,8 +2,8 @@
 // VERSION 8.45
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 - ZonaZero:
-	- Soporte -3 TP.
-	- Resistencia + 3TP.
+	- Soporte -3 TP. <-- OK
+	- Resistencia + 3TP. <-- OK
 	- Soporte y Resistencia separados por 4TP mínimo.
 	- Parametrizar Valores de soporte / resistencia.
 - BreakZero:
