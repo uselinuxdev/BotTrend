@@ -11,8 +11,8 @@
 	- BreakBear: ZeroBear - 1TP - 1 iFrancisca.
 	- BreakBull: ZeroBUL + 1TP + 1 iFrancisca.
 - Reinicio de bot con hilo abierto:
-	- Hilo no Zero. Coger Edge: Limites TP-Precio-SL(TP desde ini en negativo).
-	- Hilos Zero. Coger Operación Zero. Llamar a la función de 24h de esa operacion.
+	- Hilo no Zero. Coger Edge: Limites TP-Precio-SL(TP desde ini en negativo). <-- OK probar linea 446
+	- Hilos Zero. Coger Operación Zero. Llamar a la función de 24h de esa operacion. <-- OK
 - SL Operaciones G1 4TP 2iFranciscas. Subir Limite hilo = SL aplicado + TP.
 
 
