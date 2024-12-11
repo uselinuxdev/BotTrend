@@ -5,6 +5,7 @@
 	- Soporte -3 TP.
 	- Resistencia + 3TP.
 	- Soporte y Resistencia separados por 4TP mínimo.
+	- Parametrizar Valores de soporte / resistencia.
 - BreakZero:
 	- Soporte 2 + Franciscas.
 	- Resistenca + 2 Franciscas.
@@ -25,7 +26,7 @@
 - Reinicio de bot con hilo abierto:
 	- Hilo no Zero. Coger Edge: Limites TP-Precio-SL(TP desde ini en negativo). <-- OK probar linea 446
 	- Hilos Zero. Coger Operación Zero. Llamar a la función de 24h de esa operacion. <-- OK
-- SL Operaciones G1 4TP 2iFranciscas. Subir Limite hilo = SL aplicado + TP.
+- SL Operaciones G1 4TP 2iFranciscas. Subir Limite hilo = SL aplicado + TP. <-- OK
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
