@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2020, Usefilm Corp."
 #property link      "https://www.mql5.com"
-#define VERSION "8.30"
+#define VERSION "8.40"
 #property version VERSION
 
 // InclusiÃÂ³n de objetos de liberia estandar
@@ -90,7 +90,7 @@ double dLOTBear[9];
 
 double dHPRICE[9];
 double dLPRICE[9];
-double dZeroPRICE[9]; 
+ulong dZeroOp[9]; 
 // <--- Nivel +1TP ZeroBull -1TP ZeroBear. 8.25 VER
 double ATRENDPROFIT[9];
 // Salvar el step de todos los hilos
@@ -157,7 +157,7 @@ int OnInit()
    // INIT ARRAY DE PROFIT
    ArrayInitialize(dHPRICE,0);
    ArrayInitialize(dLPRICE,0);
-   ArrayInitialize(dZeroPRICE,0);
+   ArrayInitialize(dZeroOp,0);
    ArrayInitialize(ATRENDPROFIT,0);
    // INIT array de contador de STEP
    countbot(); 
@@ -240,13 +240,10 @@ void OnTick()
    // rCurrent tiene las barras definidas en parametro. Ultimo de array barra actual.
    if(rCurrent[piNumBars-1].tick_volume<5)
    { 
+      // Poner SL G0
+      if(SetStopLostG0()<0) return;
       // Contar ops.
       if(countbot()<0) return;
-      // Coger niveles diarios plus operaciones. 
-      // Cada 5 minutos. Soportes / Resistencias por hilo. Diario o por SL G1
-      if(GetLevels()<0) return;
-      // Grabar SL
-      if(CheckStopLost()<0) return;
       // Actualiza panel 
       RefressPanel();
    }
@@ -452,6 +449,9 @@ short UpdatePrices(int ithread,ulong lTicketEdge)
    ENUM_POSITION_TYPE TYPE_POS;
    datetime dopen;
    datetime dNow;
+   double ddiff;
+   double dPOpen;
+   double dTP;
    long lmagic;
    ulong lstep=0;
    ulong sZgravityStep=0;
@@ -466,19 +466,15 @@ short UpdatePrices(int ithread,ulong lTicketEdge)
       expertLog(); 
       return -1;
    }
-   // Control de valores sino actualiza
-   if((dLPRICE[ithread]<=0) && (dHPRICE[ithread]<=0))
-   {
-      dLPRICE[ithread] = cPos.PriceCurrent() - (2*iFrancisca*pips);
-      dHPRICE[ithread] = cPos.PriceCurrent() + (2*iFrancisca*pips);
-   }
-   // Only update if a valid edge op with profit.
-   if(cPos.Profit()<0) return 0;
-   TYPE_POS=cPos.PositionType();
+   // Control de divisa y magic.
    lmagic=cPos.Magic();
    if (_Symbol!=cPos.Symbol() || (IsMyMagic(lmagic)<0)) return 0;
    // Control de comentario
    scomment=cPos.Comment();
+   dopen=cPos.Time();
+   dPOpen=cPos.PriceOpen();
+   dTP=cPos.TakeProfit();
+   TYPE_POS=cPos.PositionType();
    // // Si el comentario estÃÂ¡ vacio coger el array
    if(StringLen(scomment)<=0)
    {
@@ -491,7 +487,25 @@ short UpdatePrices(int ithread,ulong lTicketEdge)
    {
       return 0;
    }
-   dopen=cPos.Time();
+   // Control de valores sino. Pone +1TP de esta op q es la edge.
+   ddiff=MathAbs(dPOpen-dTP);
+   if((dLPRICE[ithread]<=0) || (dHPRICE[ithread]<=0))
+   {
+      if(TYPE_POS==POSITION_TYPE_SELL)
+      { // Bear EDGE
+        dLPRICE[ithread]=dTP;
+        dHPRICE[ithread]=dPOpen+ddiff;
+      }
+      else 
+      { // BULL EDGE
+         dHPRICE[ithread]=dTP;
+         dLPRICE[ithread]=dPOpen-ddiff;
+      }
+      dLPRICE[ithread] = cPos.PriceCurrent() - (2*iFrancisca*pips);
+      dHPRICE[ithread] = cPos.PriceCurrent() + (2*iFrancisca*pips);
+   }
+      // Only update if a valid edge op with profit.
+   if(cPos.Profit()<0) return 0;
    dNow=TimeCurrent();
    // Check all bars since open edge
    int copied=CopyRates(Symbol(),PERIOD_M5,dopen,dNow,rThreadBars);
@@ -567,30 +581,6 @@ double GetBarPiecesThread(datetime doldopen,ENUM_POSITION_TYPE TYPE_POS)
 //                                              PRICE THREAD FUNTIONS END                                              //
 // ------------------------------------------------------------------------------------------------------------------- //
 
-// Conger el soporte / resistencia diario por barras de hora
-short GetLevels()
-{
-   // Coger el Nivel 0
-   ulong sZgravityStep=GetGravityStep();
-   for(int i=0;i<9;i++)
-   {
-      // SÃ³lo si el hilo tiene ops
-      if(dZeroPRICE[i]>0)
-      {
-         if (dLPRICE[i]==0)
-         {
-            // Se definirÃ¡ el nivel la primera vez. Con las barras de 24h.
-            return SetZeroLevelThread(i);
-         }
-         else
-         {
-            return UpdateZeroLevelThread(i,sZgravityStep);
-         }
-      }
-   }
-   return 1;
-}
-
 // Coger niveles de 24h
 short SetZeroLevelThread(int iThread)
 {
@@ -618,6 +608,9 @@ short SetZeroLevelThread(int iThread)
       if(rLastBars[i].low<dLPRICE[iThread]) dLPRICE[iThread]=rLastBars[i].low; 
       if(rLastBars[i].high>dHPRICE[iThread]) dHPRICE[iThread]=rLastBars[i].high; 
    }
+   // Version 8.40 Coger limites +-TP
+   dLPRICE[iThread]+=(TakeProfit*pips);
+   dHPRICE[iThread]-=(TakeProfit*pips);
    vtext="SetZeroLevelThread:Limites iniciales:Soporte:"+DoubleToString(dLPRICE[iThread])+".Resistencia:"+DoubleToString(dHPRICE[iThread])+".";
    ENUMTXT = PRINT;
    expertLog(); 
@@ -719,6 +712,21 @@ bool CheckOpenMarket()
    }
    bOpenMarket=true;   
    return bOpenMarket;
+}
+
+double GetLotStep(ulong lstep)
+{
+   double dLot=0.00;
+   ulong sZgravity;
+   // Coger el parÃ¡metro que ha seleccionado el usuario
+   sZgravity=GetGravityStep();
+   dLot=Lots*iCent;
+   for(ulong i=1;i<sZgravity;i++)
+   {
+      dLot=(dLot*2)+(Lots*iCent);
+   }
+   // Bien
+   return NormalizeDouble(dLot,lotdecimal);
 }
 
 // La funcion retorna si el NÃÂº mÃÂ¡gico es de los del bot.2 Si es un TBOT
@@ -1144,30 +1152,66 @@ short CloseThisThread(int ithread)
    return 1;
 }
 
-
-short CheckStopLost()
+// Pondrá SL en las operaciones G0.Después de evaluar los límites diarios. Si hay diferencia de lote de hilo
+short SetStopLostG0()
 {
    ulong sZgravityStep;
+   double diff=0;
    int ipos=0;
    // Coger el parÃ¡metro que ha seleccionado el usuario
    sZgravityStep=GetGravityStep();
    // Check all Threads
    for(int i=0;i<9;i++) // returns los posibles hilos
    {
-      if(SetStopLostThread(i,sZgravityStep)<0) return -1;
+      diff=MathAbs(dLOTBear[i]-dLOTBULL[i]);
+      if(diff>(0))
+      {
+         if(SetStopLostThread(i,sZgravityStep)<0) return -1;
+      }
    }
    // Bien
    return 1;
 }
-// Recorrer las op del hilo. PequeÃ±as 2TP/2Fran. Grandes 4TP/2Fran
+// Recorrer las op del hilo. Salvar las G0 en ganancias. 
+// Si El Nuevo TP es menor q el valor contrario de Soporte/resistencia diario
 short SetStopLostThread(int iThread, ulong sZgravityStep)
 {
    ulong ticket=0;
    ulong lstep=0;
    string scomment;
+   double dsuport,dresistence=0;
    ENUM_POSITION_TYPE TYPE_POS;
-   double dNewSL,dOpen,dCurrent,ddiff=0.00;
-
+   double dNewSL,dOpen,dCurrent=0.00;
+   
+      MqlRates rLastBars[];
+   // Hacerlo con 5min (12(60/5) * 24h)
+   //int iPeriodos=24;
+   int iPeriodos=288;
+   SymbolInfo.Name(_Symbol);
+   SymbolInfo.Refresh();
+   SymbolInfo.RefreshRates();
+   // 24h antes
+   int copied=CopyRates(Symbol(),PERIOD_M5,iPeriodos,iPeriodos,rLastBars);
+   if(copied<iPeriodos)
+   {
+      vtext="SetStopLostThread: No se ha podido cargar las barras de las últimas 24h.";
+      ENUMTXT = PRINT;
+      expertLog(); 
+      return -1;
+   }
+   // Reset values
+   dsuport=rLastBars[0].low;
+   dresistence=rLastBars[0].high;
+   // Recorrer array
+   for(int i=0;i<copied;i++)
+   { 
+      if(rLastBars[i].low<dsuport) dsuport=rLastBars[i].low; 
+      if(rLastBars[i].high>dresistence) dresistence=rLastBars[i].high; 
+   }
+   // Aplicar 3TP:
+   dsuport = dsuport - (3*TakeProfit*pips);
+   dresistence = dresistence +(3*TakeProfit*pips);
+   
    // Check all threads
    for(int x=0;x<99;x++)
    {
@@ -1198,19 +1242,18 @@ short SetStopLostThread(int iThread, ulong sZgravityStep)
          // Control de SL
          dOpen=cPos.PriceOpen();
          dCurrent=cPos.PriceCurrent();
-         ddiff=MathAbs(dOpen-dCurrent);
          // SÃ³lo poner SL en operaciones G0
          if(lstep!=sZgravityStep) continue;
-         // Operaciones G2 4TP / 2Ifranciscas
-         if(ddiff<(4*TakeProfit*pips)) continue;
          // Control de hilo en esa dir.
          if(TYPE_POS==POSITION_TYPE_SELL)
          {
             dNewSL=dOpen-(TakeProfit*pips);
+            if(dNewSL<dresistence) continue;
          }
          if(TYPE_POS==POSITION_TYPE_BUY)
          {
             dNewSL=dOpen+(TakeProfit*pips);
+            if(dNewSL>dsuport) continue;
          }
          if(dNewSL>0)
          { // Actualiza SL
@@ -1285,6 +1328,9 @@ short CheckForOpen()
       
       // Reset contador de beneficios
       ATRENDPROFIT[ifreepos]=Cacc.Balance();
+      ArrayInitialize(dHPRICE,0);
+      ArrayInitialize(dLPRICE,0);
+      ArrayInitialize(dZeroOp,0);
       // Pintar tendencia. SÃÂ³lo cuando se va a abrir
       // Bar is new  
       checkBardir();
@@ -1304,7 +1350,7 @@ short CheckForOpen()
       dLPRICE[ifreepos]-=((TakeProfit+iFrancisca)*pips);
       dHPRICE[ifreepos]=SymbolInfo.Bid();
       dHPRICE[ifreepos]+=((TakeProfit+iFrancisca)*pips);
-      dZeroPRICE[ifreepos] = 0; // Resetear valor de Zero.
+      dZeroOp[ifreepos] = 0; // Resetear valor de Zero.
       switch(ENUMBARDIR)
       {
          case POSITION_TYPE_SELL:
@@ -1540,12 +1586,12 @@ int CheckNewStep()
       lstep=GetStep(scomment);
       lMagic=cPos.Magic();
       lNewStep=lstep+1;
-      // Esta funciÃÂ³n sÃÂ³lo llega hasta step lateral
+      // Esta Función llega hasta G0 -1.
       // Poner Nuevos SL/TP del hilo
-      if(lstep>=sZgravityStep)
+      if(lstep>=(sZgravityStep-1))
       {
          enumbotmode=ZERO_GRAVITY;
-         vtext="Gravedad 0 activada. Llamando a funciÃÂ³n de ZeroGravity.";
+         vtext="Gravedad 0 activada.";
          continue;
       }
       // SÃÂ³lo trabajar con la ÃÂºltima op.
@@ -1672,29 +1718,23 @@ double NewStep(double dTP,ulong lstep,ulong sZgravity,string scoment,ENUM_POSITI
    // TamaÃÂ±o del lote
    LotOrig=cPos.Volume();
    LotStep=(LotOrig*2)+(Lots*iCent);
-   // Control ZGravity
-   if((lstep>=sZgravity))
-   {
-      // Gravedad 0
-      vtext="NewStep: Lote en gravedad 0 calculado: "+DoubleToString(LotStep)+".Reseting Zero Zone.";
-      lThread=lMagic-MAGICTREND;
-      // Reset ZoneZero
-      dZeroPRICE[lThread]=0;
-      dLPRICE[lThread]=0;
-      dHPRICE[lThread]=0;
-      // Resetar comentario a op. maxima normal de ZeroGravity
-      StringReplace(scoment,": "+IntegerToString(lstep),": "+IntegerToString(sZgravity)); 
-   }
-   // Si esta en gravedad 0 no hacer nada.
    if(LotStep<=0) return 0;
-   // Asignar el numero mÃÂ¡gico 
+      // Control ZGravity
+   if(lstep>=(sZgravity-1))
+   {
+      lThread=lMagic-MAGICTREND;
+      // Resetar limites para funciones G0
+      dLPRICE[lThread]=0;
+      dHPRICE[lThread]=0;     
+   }
+   // Asignar el numero Mágico
    cTrade.SetExpertMagicNumber(lMagic); 
    switch(TYPE_POS)
    {
       case POSITION_TYPE_SELL:
          if(!cTrade.Sell(LotStep,_Symbol,0,0,dTP,scoment))
          {
-            vtext="Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operaciÃÂ³n de "+DoubleToString(LotStep)+".";
+            vtext="Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operación de "+DoubleToString(LotStep)+".";
             ENUMTXT = PRINT;
             expertLog();
             return -1;
@@ -1704,7 +1744,7 @@ double NewStep(double dTP,ulong lstep,ulong sZgravity,string scoment,ENUM_POSITI
       case POSITION_TYPE_BUY:
          if(!cTrade.Buy(LotStep,_Symbol,0,0,dTP,scoment))
          {
-            vtext="Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operaciÃÂ³n de "+DoubleToString(LotStep)+".";
+            vtext="Se ha producido el error "+IntegerToString(GetLastError())+" al abrir una operación de "+DoubleToString(LotStep)+".";
             ENUMTXT = PRINT;
             expertLog();
             return -1;
@@ -1946,12 +1986,12 @@ short EqualZero()
    // Bien
    return 1;
 }
+
 // GenerarÃ¡ 2 operaciones 0.01 para G0 y resto G1 para poder ser limpiada por SL funtion.
 short EqualZeroThread(int ithread,ulong sZgravityStep)
 {
    ulong lticket=0;
    double dCurrentPrice=0;
-   double dZeroTypePrice=0;
    double dOpen=0;
    double dLot=Lots*iCent;
    double dNewLot=0.00;
@@ -1970,9 +2010,9 @@ short EqualZeroThread(int ithread,ulong sZgravityStep)
          i=99;
          if(bZero==false) return 1;
          // Con el ZeroZone +- 1TP
-         dZeroTypePrice=dZeroPRICE[ithread]-(TakeProfit*pips);
+         /////////////////////////////////////////////dZeroTypePrice=dZeroPRICE[ithread]-(TakeProfit*pips);
          // Control de precio con respecto a lÃÂ­mites
-         if((dCurrentPrice<dZeroTypePrice) && (dLOTBear[ithread] < dLOTBULL[ithread]))
+         if((dCurrentPrice<dLPRICE[ithread]) && (dLOTBear[ithread] < dLOTBULL[ithread]))
          {
             TYPE_Break=POSITION_TYPE_SELL;
             dNewLot=(dLOTBULL[ithread]-dLOTBear[ithread]);
@@ -1980,8 +2020,8 @@ short EqualZeroThread(int ithread,ulong sZgravityStep)
             return CreateOpZero(TYPE_Break,dNewLot,sZgravityStep);
          }
          // Con el ZeroZone +- 1TP
-         dZeroTypePrice=dZeroPRICE[ithread]+(TakeProfit*pips);
-         if((dCurrentPrice>dZeroTypePrice) && (dLOTBULL[ithread] < dLOTBear[ithread]))
+         ////////////////////////////////////////////////dZeroTypePrice=dZeroPRICE[ithread]+(TakeProfit*pips);
+         if((dCurrentPrice>dHPRICE[ithread]) && (dLOTBULL[ithread] < dLOTBear[ithread]))
          {
             TYPE_Break=POSITION_TYPE_BUY;
             dNewLot=(dLOTBear[ithread]-dLOTBULL[ithread]);
@@ -2005,13 +2045,17 @@ short EqualZeroThread(int ithread,ulong sZgravityStep)
          scomment=cPos.Comment();
          lstep=GetStep(scomment); 
          // No hacer nada mientras el hilo no se GZero
-         if(lstep>=sZgravityStep) 
+         if(lstep>=(sZgravityStep-1)) 
          {
             // FunciÃ³n para identificar el nivel 0. Si no se ha definido/reseteado bot.
-            if(dZeroPRICE[ithread]<=0) 
+            if(dZeroOp[ithread]<=0) 
             {
-               if(SetLevelZeroThread(ithread,sZgravityStep)<0) return -1;
-               if(GetLevels()<0) return -1;
+               // Asignar operación GZero
+               dZeroOp[ithread]=lticket;
+               vtext="EqualZeroThread.Zona 0 en ticket:"+DoubleToString(dZeroOp[ithread]);
+               ENUMTXT = PRINT;
+               expertLog();
+               if(SetZeroLevelThread(ithread)<0) return -1;
             }
             bZero=true;
          }
@@ -2025,6 +2069,7 @@ short BreakZero()
 {
    ulong sZgravityStep;
    double dCurrent=0.00;
+   double dlevel=0.00;
    // Si el mercado no va a abrir
    if(CheckOpenMarket()==false) return 1;
    // Coger nivel actual
@@ -2041,14 +2086,18 @@ short BreakZero()
    for(int i=0;i<9;i++) // returns los posibles hilos
    {
       // SÃ³lo hilos en G0
-      if((dZeroPRICE[i]==0) || (dLPRICE[i]<=0)) continue;
+      if((dZeroOp[i]==0) || (dLPRICE[i]<=0)) continue;
+      // Nivel BearBreak
+      dlevel=dLPRICE[i]-((TakeProfit+iFrancisca)*pips);
       // Control de rotura SELL
-      if(dLPRICE[i]>dCurrent)
+      if(dlevel>dCurrent)
       {
          if(BreakZeroThread(i,sZgravityStep,POSITION_TYPE_SELL)<0) return -1;
       }
       // Control Buy
-      if(dHPRICE[i]<dCurrent)
+      // Nivel BULLBreak
+      dlevel=dHPRICE[i]+((TakeProfit+iFrancisca)*pips);
+      if(dlevel<dCurrent)
       {
          if(BreakZeroThread(i,sZgravityStep,POSITION_TYPE_BUY)<0) return -1;
       }      
@@ -2173,109 +2222,6 @@ short CreateOpZero(ENUM_POSITION_TYPE TYPE_POS,double dZeroLot,ulong sNewStep)
    // Bien
    return 1;
 }
-
-// Recorrer las op del hilo.
-short SetLevelZeroThread(int iThread, ulong sZgravityStep)
-{
-   ulong ticket=0;
-   ulong lstep=0;
-   string scomment;
-   // Resetear Valor
-   dZeroPRICE[iThread]=0;
-   double dMidle=0;
-   ENUM_POSITION_TYPE TYPE_POS;
-   double dOpen;
-   
-   // Check all threads
-   for(int x=0;x<99;x++)
-   {
-      // Control si encuentra parar.
-      if(ATREND[iThread][x]==0)
-      {
-         // Si ha llegado hasta aquÃ­, hilo en G0 sin op G0 poner G0 absoluto.
-         dMidle=(dMidle/x);
-         dZeroPRICE[iThread]=dMidle;
-         // Set 0 limites
-         dLPRICE[iThread]=0;
-         dHPRICE[iThread]=0;
-         vtext="SetLevelZeroThread.Zona 0 absoluta.:"+DoubleToString(dZeroPRICE[iThread])+".No se han encontrado tiket Zero.";
-         ENUMTXT = PRINT;
-         expertLog();
-         x=99;
-      }
-      else
-      {
-         // Cargar el ticket Zero
-         ticket=ATREND[iThread][x];  
-         if(!cPos.SelectByTicket(ticket))
-         {
-            vtext="Error en SetLevelZeroThread seleccionado ticket "+IntegerToString(ticket)+". Ãltimo error encontrado:"+IntegerToString(GetLastError())+".No se evaluarÃ¡.";
-            ENUMTXT = PRINT;
-            expertLog();
-            return -1;
-         }
-         // Coger tipo de op
-         dOpen=cPos.PriceOpen();
-         //Control de medio absoluto
-         dMidle+=dOpen;
-         TYPE_POS=cPos.PositionType();
-         scomment=cPos.Comment();
-         lstep=GetStep(scomment);
-         // Con primera G0 pintar zona.
-         if(TYPE_POS==POSITION_TYPE_SELL)
-         {
-            dZeroPRICE[iThread]=dOpen+(TakeProfit*pips);
-         }
-         else
-         { // Operaciones Zero BULL
-            dZeroPRICE[iThread]=dOpen-(TakeProfit*pips);
-         }
-         // Borrar TP de op antiguas.
-         // Si ha llegado aqui el hilo estÃ¡ en G0. Se pueden usar esas ops para sumar.
-         if(ClearTP()<0) return -1;
-         // Localizada G0 pintar y salir
-         if(lstep==sZgravityStep)
-         {
-            // Set 0 limites
-            dLPRICE[iThread]=0;
-            dHPRICE[iThread]=0;
-            vtext="SetLevelZeroThread.Localizada Zona 0 de hilo:"+DoubleToString(dZeroPRICE[iThread])+".Ticket Zero:"+IntegerToString(ticket)+".";
-            ENUMTXT = PRINT;
-            expertLog();
-            return 1;
-         }
-      }
-   }
-   // Bien
-   return 1;
-}
-// Tengo la op cargada. Es G-1. Eliminar SL/TP si procede.
-short ClearTP()
-{
-   double dTP = 0.00;
-   ulong ticket=0;
-   // Check all ops
-   ticket=cPos.Ticket();
-   dTP=cPos.TakeProfit();
-   // Si no estÃÂ¡ en ganancias siguiente
-   if(dTP<=0) return 1;
-   // Si esta en beneficios el sl no tocar
-   if(bCheckSlProfit()== true) return 1;
-   // Actualizar Posicion
-   if(!cTrade.PositionModify(ticket,0,0))
-   {
-      vtext="Error al actualizar ClearTP en ticket "+IntegerToString(ticket)+" error:"+IntegerToString(GetLastError());
-      ENUMTXT = PRINT;
-      expertLog();
-      return -1;
-   }
-   vtext="ClearTP aplicado en ticket G-1 "+IntegerToString(ticket)+". TP desactivado.";
-   ENUMTXT = PRINT;
-   expertLog();
-   // Bien
-   return 1;
-}
-
 
 //              ------------------------------------------------------------------------------------------------------------------- //
 //              ----------------------------------------------- ZERO GRAVITY CODE ------------------------------------------------------ //
