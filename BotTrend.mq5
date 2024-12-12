@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2020, Usefilm Corp."
 #property link      "https://www.mql5.com"
-#define VERSION "8.40"
+#define VERSION "8.45"
 #property version VERSION
 
 // InclusiÃÂ³n de objetos de liberia estandar
@@ -608,9 +608,9 @@ short SetZeroLevelThread(int iThread)
       if(rLastBars[i].low<dLPRICE[iThread]) dLPRICE[iThread]=rLastBars[i].low; 
       if(rLastBars[i].high>dHPRICE[iThread]) dHPRICE[iThread]=rLastBars[i].high; 
    }
-   // Version 8.40 Coger limites +-TP
-   dLPRICE[iThread]+=(TakeProfit*pips);
-   dHPRICE[iThread]-=(TakeProfit*pips);
+   // Version 8.45 Coger limites +-TP
+   dLPRICE[iThread]-=(TakeProfit*pips);
+   dHPRICE[iThread]+=(TakeProfit*pips);
    vtext="SetZeroLevelThread:Limites iniciales:Soporte:"+DoubleToString(dLPRICE[iThread])+".Resistencia:"+DoubleToString(dHPRICE[iThread])+".";
    ENUMTXT = PRINT;
    expertLog(); 
@@ -2071,7 +2071,7 @@ short BreakZero()
    double dCurrent=0.00;
    double dlevel=0.00;
    // Si el mercado no va a abrir
-   if(CheckOpenMarket()==false) return 1;
+   /////////////////////////////////if(CheckOpenMarket()==false) return 1;
    // Coger nivel actual
    dCurrent=(SymbolInfo.Ask()+SymbolInfo.Bid())/2;
    // Coger el parÃÂ¡metro que ha seleccionado el usuario
@@ -2088,7 +2088,7 @@ short BreakZero()
       // SÃ³lo hilos en G0
       if((dZeroOp[i]==0) || (dLPRICE[i]<=0)) continue;
       // Nivel BearBreak
-      dlevel=dLPRICE[i]-((TakeProfit+iFrancisca)*pips);
+      dlevel=dLPRICE[i]-(((2*TakeProfit)+iFrancisca)*pips);
       // Control de rotura SELL
       if(dlevel>dCurrent)
       {
@@ -2096,7 +2096,7 @@ short BreakZero()
       }
       // Control Buy
       // Nivel BULLBreak
-      dlevel=dHPRICE[i]+((TakeProfit+iFrancisca)*pips);
+      dlevel=dHPRICE[i]+(((2*TakeProfit)+iFrancisca)*pips);
       if(dlevel<dCurrent)
       {
          if(BreakZeroThread(i,sZgravityStep,POSITION_TYPE_BUY)<0) return -1;
@@ -2280,3 +2280,4 @@ double GetGreenPrice(double dNewPrice,ENUM_POSITION_TYPE TYPE_POS)
 ///////////////////////////// NEW DEVS
 
 ///////////////////////////// DEPRECIDED FUNTIONS
+
