@@ -502,8 +502,6 @@ short UpdatePrices(int ithread,ulong lTicketEdge)
          dHPRICE[ithread]=dTP;
          dLPRICE[ithread]=dPOpen-ddiff;
       }
-      dLPRICE[ithread] = cPos.PriceCurrent() - (2*iFrancisca*pips);
-      dHPRICE[ithread] = cPos.PriceCurrent() + (2*iFrancisca*pips);
    }
       // Only update if a valid edge op with profit.
    if(cPos.Profit()<0) return 0;
