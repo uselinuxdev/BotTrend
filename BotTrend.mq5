@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2020, Usefilm Corp."
 #property link      "https://www.mql5.com"
-#define VERSION "8.45"
+#define VERSION "8.50"
 #property version VERSION
 
 // InclusiÃÂ³n de objetos de liberia estandar
@@ -122,6 +122,7 @@ input ENUM_CENT ENUMCENT=CENT_1;
 input datetime dWaitBreakZero;
 bool bOpenMarket=true;
 input ENUM_ZGRAVITY EZGRAVITY=STEP_3;
+input double idSupportBot, idResistanceBot=0;
 input short shourclose=16;
 
 
@@ -2087,6 +2088,18 @@ short BreakZero()
    {
       // SÃ³lo hilos en G0
       if((dZeroOp[i]==0) || (dLPRICE[i]<=0)) continue;
+      // Control de parámetros de usuario
+      if((idSupportBot>0) || (idResistanceBot>0))
+      {
+         if((dLPRICE[i]!=idSupportBot) || (dHPRICE[i]!=idResistanceBot))
+         {
+            dLPRICE[i]=idSupportBot;
+            dHPRICE[i]=idResistanceBot;
+            vtext="BreakZero cambio niveles definidos por usuario,Soporte:"+DoubleToString(idSupportBot)+".Resistencia:"+DoubleToString(idResistanceBot);
+            ENUMTXT = PRINT;
+            expertLog();  
+         }
+      }  
       // Nivel BearBreak
       dlevel=dLPRICE[i]-(((2*TakeProfit)+iFrancisca)*pips);
       // Control de rotura SELL
@@ -2280,4 +2293,3 @@ double GetGreenPrice(double dNewPrice,ENUM_POSITION_TYPE TYPE_POS)
 ///////////////////////////// NEW DEVS
 
 ///////////////////////////// DEPRECIDED FUNTIONS
-
