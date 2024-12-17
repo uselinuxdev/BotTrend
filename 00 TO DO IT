@@ -5,6 +5,7 @@
 - Test Reboot hilo pequeñas. <--OK
 - Test Reboot hilo grandes.
 - Test Control de soportes/resistencias definidas por usuario.
+- SL Operaciones G0 y G1.
 - Si es posible pintar lineas Magic_Suport / Magic_Resistence. Usar esas líneas para el bot.
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
