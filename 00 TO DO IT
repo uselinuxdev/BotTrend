@@ -4,6 +4,7 @@
 - Parámetros definidos por usuario : Soporte / Resistencia. <--OK
 - Test Reboot hilo pequeñas. <--OK
 - Test Reboot hilo grandes. <-- OK Coge la operación más baja y asigna los soportes/resistencias de las últimas 24h.
+- Cambiar última hora 15h. Para que después de WallStreet no haga operaciones.
 - Test Control de soportes/resistencias definidas por usuario.
 - SL Operaciones G0 y G1.Subir Limite 1TP+2FRANCISCAS.
 - Si es posible pintar lineas Magic_Suport / Magic_Resistence. Usar esas líneas para el bot.
