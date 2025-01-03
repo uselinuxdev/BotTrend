@@ -123,7 +123,7 @@ input datetime dWaitBreakZero;
 bool bOpenMarket=true;
 input ENUM_ZGRAVITY EZGRAVITY=STEP_3;
 input double idSupportBot, idResistanceBot=0;
-input short shourclose=16;
+input short shourclose=15;
 
 
 // Dont open when the market will be to close. Or opened 1h.
@@ -686,7 +686,7 @@ bool CheckOpenMarket()
    // Session	Major Market	Hours (GMT)
    // -----------------------------------------------
    // // European Session	London	9:00 GMT (Lock 30 min till it)
-   if((strdate.hour==8 && strdate.min > 30 ) || (strdate.hour==9 && strdate.min < 2))
+   if((strdate.hour==8 && strdate.min > 45 ) || (strdate.hour==9 && strdate.min < 2))
    {
       if(bOpenMarket==true)
       {
@@ -1207,9 +1207,9 @@ short SetStopLostThread(int iThread, ulong sZgravityStep)
       if(rLastBars[i].low<dsuport) dsuport=rLastBars[i].low; 
       if(rLastBars[i].high>dresistence) dresistence=rLastBars[i].high; 
    }
-   // Aplicar 3TP:
-   dsuport = dsuport - (3*TakeProfit*pips);
-   dresistence = dresistence +(3*TakeProfit*pips);
+   // Aplicar 2TP:
+   dsuport = dsuport - (2*TakeProfit*pips);
+   dresistence = dresistence +(2*TakeProfit*pips);
    
    // Check all threads
    for(int x=0;x<99;x++)
@@ -1225,7 +1225,7 @@ short SetStopLostThread(int iThread, ulong sZgravityStep)
          ticket=ATREND[iThread][x];  
          if(!cPos.SelectByTicket(ticket))
          {
-            vtext="Error en SetStopLostThread seleccionado ticket "+IntegerToString(ticket)+". Ãltimo error encontrado:"+IntegerToString(GetLastError())+".No se evaluarÃ¡.";
+            vtext="Error en SetStopLostThread seleccionado ticket "+IntegerToString(ticket)+". último error encontrado:"+IntegerToString(GetLastError())+".No se evaluarÃ¡.";
             ENUMTXT = PRINT;
             expertLog();
             return -1;
@@ -1241,29 +1241,39 @@ short SetStopLostThread(int iThread, ulong sZgravityStep)
          // Control de SL
          dOpen=cPos.PriceOpen();
          dCurrent=cPos.PriceCurrent();
-         // SÃ³lo poner SL en operaciones G0
-         if(lstep!=sZgravityStep) continue;
+         // Sólo poner SL en operaciones G0 y G1
+         if(lstep<sZgravityStep) continue;
          // Control de hilo en esa dir.
          if(TYPE_POS==POSITION_TYPE_SELL)
          {
             dNewSL=dOpen-(TakeProfit*pips);
             if(dNewSL<dresistence) continue;
+            // Actualizar resistencia con SL + 2 iFranciscas
+            dLPRICE[iThread] = dNewSL -(2*iFrancisca*pips);
+            vtext="SetStopLostThread actualiza precio de soporte de hilo:"+DoubleToString(dLPRICE[iThread]);
+            ENUMTXT = PRINT;
+            expertLog();
          }
          if(TYPE_POS==POSITION_TYPE_BUY)
          {
             dNewSL=dOpen+(TakeProfit*pips);
             if(dNewSL>dsuport) continue;
+            // Actualizar soporte con SL + 2 iFranciscas
+            dHPRICE[iThread] = dNewSL - (2*iFrancisca*pips);
+            vtext="SetStopLostThread actualiza precio de resistencia de hilo:"+DoubleToString(dHPRICE[iThread]);
+            ENUMTXT = PRINT;
+            expertLog();
          }
          if(dNewSL>0)
          { // Actualiza SL
             if(!cTrade.PositionModify(ticket,dNewSL,0))
             {
-               vtext="Error en funciÃ³n SetStopLostThread al actualizar niveles en ticket "+IntegerToString(ticket)+" error:"+IntegerToString(GetLastError());
+               vtext="Error en función SetStopLostThread al actualizar niveles en ticket "+IntegerToString(ticket)+" error:"+IntegerToString(GetLastError());
                ENUMTXT = PRINT;
                expertLog();
                return -1;
             }
-            vtext="SetStopLostThread actualizÃ³ niveles en ticket "+IntegerToString(ticket)+" Nuevo SL:"+DoubleToString(dNewSL);
+            vtext="SetStopLostThread actualiza niveles en ticket "+IntegerToString(ticket)+" Nuevo SL:"+DoubleToString(dNewSL);
             ENUMTXT = PRINT;
             expertLog();
          } 
@@ -2291,3 +2301,5 @@ double GetGreenPrice(double dNewPrice,ENUM_POSITION_TYPE TYPE_POS)
 ///////////////////////////// NEW DEVS
 
 ///////////////////////////// DEPRECIDED FUNTIONS
+
+
