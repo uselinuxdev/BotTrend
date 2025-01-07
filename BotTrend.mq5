@@ -272,8 +272,8 @@ void LoadLicenceAccount()
    ALOGINGOLD[6]=206400;
    // Angela Recio (Carlos Sastre)
    ALOGINGOLD[7]=206969;
-   // Gaiton REAL
-   ALOGINGOLD[8]=7023169;
+   // USE DEMO FUSION
+   ALOGINGOLD[8]=136747;
    // Use ROBOFOREX
    ALOGINGOLD[9]=67013738;
      
