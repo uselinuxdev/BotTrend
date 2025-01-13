@@ -210,7 +210,7 @@ void OnTick()
    // Every ticks Check Franciscada
    if(goFrancisca()<0) return;
    // Comprobar hilo en beneficios PRD code
-   /////////////////if(CheckAllThreadProfit()<0) return;   
+   if(CheckAllThreadProfit()<0) return;   
    //// Check for new steps // EN PROD PONER CADA TICK
    if(CheckNewStep()<0) return;
    // Igualar hilo G 0
@@ -229,7 +229,7 @@ void OnTick()
       // 8.25 funtion. Upload prices limits every minute. SÃ³lo hilos pequeÃ±os
       if(UpdateThreadPrices()<0) return;
       // Comprobar hilo en beneficios TEST code
-      if(CheckAllThreadProfit()<0) return;
+      ////if(CheckAllThreadProfit()<0) return;
       // Abrir cada minuto
       if((MarketClosing()!=0) && (BotVacation()!=0))
       {
@@ -2097,13 +2097,19 @@ short BreakZero()
       // SÃ³lo hilos en G0
       if((dZeroOp[i]==0) || (dLPRICE[i]<=0)) continue;
       // Control de parámetros de usuario
-      if((idSupportBot>0) || (idResistanceBot>0))
+      if((idSupportBot>0) && (idResistanceBot>0))
       {
-         if((dLPRICE[i]!=idSupportBot) || (dHPRICE[i]!=idResistanceBot))
+         if((dLPRICE[i]!=idSupportBot) && idSupportBot>0)
          {
             dLPRICE[i]=idSupportBot;
+            vtext="BreakZero cambio niveles definidos por usuario,Soporte:"+DoubleToString(idSupportBot);
+            ENUMTXT = PRINT;
+            expertLog();  
+         }
+         if((dHPRICE[i]!=idResistanceBot) && idResistanceBot>0)
+         {
             dHPRICE[i]=idResistanceBot;
-            vtext="BreakZero cambio niveles definidos por usuario,Soporte:"+DoubleToString(idSupportBot)+".Resistencia:"+DoubleToString(idResistanceBot);
+            vtext="BreakZero cambio niveles definidos por usuario,Resistencia:"+DoubleToString(idResistanceBot);
             ENUMTXT = PRINT;
             expertLog();  
          }
@@ -2301,5 +2307,3 @@ double GetGreenPrice(double dNewPrice,ENUM_POSITION_TYPE TYPE_POS)
 ///////////////////////////// NEW DEVS
 
 ///////////////////////////// DEPRECIDED FUNTIONS
-
-
