@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2020, Usefilm Corp."
 #property link      "https://www.mql5.com"
-#define VERSION "8.50"
+#define VERSION "8.51"
 #property version VERSION
 
 // InclusiÃÂ³n de objetos de liberia estandar
@@ -74,6 +74,7 @@ enum ENUM_ZGRAVITY
 // CONTROL POR TIEMPO
 datetime timeCurent;
 datetime timeCheck;
+datetime timeNextZero;
 
 //--- Global vars
 //+------------------------------------------------------------------+
@@ -154,6 +155,7 @@ int OnInit()
    // Check point symbol
    double ticksize=SymbolInfoDouble(Symbol(), SYMBOL_TRADE_TICK_SIZE);
    pips=ticksize;
+   timeNextZero=TimeCurrent(); // Start zero if it is need
    timeCheck=TimeCurrent()+75;
    // INIT ARRAY DE PROFIT
    ArrayInitialize(dHPRICE,0);
@@ -210,7 +212,7 @@ void OnTick()
    // Every ticks Check Franciscada
    if(goFrancisca()<0) return;
    // Comprobar hilo en beneficios PRD code
-   if(CheckAllThreadProfit()<0) return;   
+   //////////////////////////////////////////////////////////////if(CheckAllThreadProfit()<0) return;   
    //// Check for new steps // EN PROD PONER CADA TICK
    if(CheckNewStep()<0) return;
    // Igualar hilo G 0
@@ -229,7 +231,7 @@ void OnTick()
       // 8.25 funtion. Upload prices limits every minute. SÃ³lo hilos pequeÃ±os
       if(UpdateThreadPrices()<0) return;
       // Comprobar hilo en beneficios TEST code
-      ////if(CheckAllThreadProfit()<0) return;
+      if(CheckAllThreadProfit()<0) return;
       // Abrir cada minuto
       if((MarketClosing()!=0) && (BotVacation()!=0))
       {
@@ -2211,6 +2213,12 @@ short CreateOpZero(ENUM_POSITION_TYPE TYPE_POS,double dZeroLot,ulong sNewStep)
    double dLot=Lots*iCent;
    // Control 0 Lots.
    if(dZeroLot<dLot) return 0;
+   // Control de fecha
+   if(timeCurent<timeNextZero)
+   {
+      vtext="Fecha actual es inferior a "+TimeToString(timeNextZero);
+      return 0;
+   }
    // Tiene cargada la ÃÂºltima operaciÃÂ³n del hilo
    scomment=cPos.Comment();
    lstep=GetStep(scomment);
@@ -2243,7 +2251,8 @@ short CreateOpZero(ENUM_POSITION_TYPE TYPE_POS,double dZeroLot,ulong sNewStep)
          return -1;
       }  
    }
-   vtext="CreateOpZero: se ha aÃ±adido nueva operaciÃ³n en hilo "+IntegerToString(iThread)+":"+DoubleToString(dZeroLot)+".";;
+   timeNextZero=TimeCurrent()+60;
+   vtext="CreateOpZero: se ha añadido nueva operación en hilo "+IntegerToString(iThread)+":"+DoubleToString(dZeroLot)+".Tiempo mínimo siguiente Operación:"+TimeToString(timeNextZero);
    ENUMTXT = PRINT;
    expertLog();    
    // Bien
