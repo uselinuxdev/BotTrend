@@ -123,7 +123,6 @@ input ENUM_CENT ENUMCENT=CENT_1;
 input datetime dWaitBreakZero;
 bool bOpenMarket=true;
 input ENUM_ZGRAVITY EZGRAVITY=STEP_3;
-input double idSupportBot, idResistanceBot=0;
 input short shourclose=15;
 
 
@@ -2103,24 +2102,6 @@ short BreakZero()
    {
       // SÃ³lo hilos en G0
       if((dZeroOp[i]==0) || (dLPRICE[i]<=0)) continue;
-      // Control de parámetros de usuario
-      if((idSupportBot>0) && (idResistanceBot>0))
-      {
-         if((dLPRICE[i]!=idSupportBot) && idSupportBot>0)
-         {
-            dLPRICE[i]=idSupportBot;
-            vtext="BreakZero cambio niveles definidos por usuario,Soporte:"+DoubleToString(idSupportBot);
-            ENUMTXT = PRINT;
-            expertLog();  
-         }
-         if((dHPRICE[i]!=idResistanceBot) && idResistanceBot>0)
-         {
-            dHPRICE[i]=idResistanceBot;
-            vtext="BreakZero cambio niveles definidos por usuario,Resistencia:"+DoubleToString(idResistanceBot);
-            ENUMTXT = PRINT;
-            expertLog();  
-         }
-      }  
       // Nivel BearBreak
       dlevel=dLPRICE[i]-(((2*TakeProfit)+iFrancisca)*pips);
       // Control de rotura SELL
