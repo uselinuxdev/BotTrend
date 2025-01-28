@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// VERSION 8.51
+// VERSION 8.75
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 - Parámetros definidos por usuario : Soporte / Resistencia. <--OK
 - Test Reboot hilo pequeñas. <--OK
@@ -7,9 +7,9 @@
 - Cambiar última hora 15h. Para que después de WallStreet no haga operaciones. <--OK
 - SL Operaciones G0 y G1.Subir Limite 1TP+2FRANCISCAS.  <--OK
 - Usar temporizador de creación/nuevo temporizador para desactivar creación continua de Zeroops por bugs.  <--OK
-- Si es posible pintar lineas Magic_Suport / Magic_Resistence. Usar esas líneas para el bot.
+- Si es posible pintar lineas Magic_Suport / Magic_Resistence. Usar esas líneas para el bot.  <-- OK
 	(https://www.mql5.com/en/docs/constants/objectconstants/enum_object/obj_hline)
-- Test Control de soportes/resistencias definidas por usuario. Si se define FALLA no activar hasta ok.
+- Test Control de soportes/resistencias definidas por usuario en Barra. <-- Usar valores de inithread para testear.
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // VERSION 8.45
