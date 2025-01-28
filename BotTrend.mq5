@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2020, Usefilm Corp."
 #property link      "https://www.mql5.com"
-#define VERSION "8.51"
+#define VERSION "8.75"
 #property version VERSION
 
 // InclusiÃÂ³n de objetos de liberia estandar
@@ -177,6 +177,8 @@ int OnInit()
       ExtDialog.Run();
    }
 //---
+   // Clear Hlines
+   ClearPrevLines();
    return(INIT_SUCCEEDED);
   }
 //+------------------------------------------------------------------+
@@ -237,6 +239,8 @@ void OnTick()
       {
          if(CheckForOpen()<0) return;
       }
+      // Check if user move ZeroZones
+      if(!HLineCheckMoved())  return;
    }
    // BreakEvent en posiciones laterales iguales
    //--- go trading only for first ticks of new bar. Actual bar is the last array element
@@ -615,8 +619,8 @@ short SetZeroLevelThread(int iThread)
    vtext="SetZeroLevelThread:Limites iniciales:Soporte:"+DoubleToString(dLPRICE[iThread])+".Resistencia:"+DoubleToString(dHPRICE[iThread])+".";
    ENUMTXT = PRINT;
    expertLog(); 
-   // Bien
-   return 1;
+   // Paint hlines
+   return CreateHZerolines(iThread);
 }
 // Cada min comprobarÃ¡ si el nivel del hilo se tiene que actualizar con las operaciones G2 (Breakops)
 short UpdateZeroLevelThread(int iThread,ulong sZgravityStep)
@@ -1335,6 +1339,7 @@ short CheckForOpen()
          return 0;  
       }    
       // Cambiar mode del bot
+      if(!ClearPrevLines()) return -1;
       enumbotmode=WORKING_DAY;
       
       // Reset contador de beneficios
@@ -2258,6 +2263,234 @@ short CreateOpZero(ENUM_POSITION_TYPE TYPE_POS,double dZeroLot,ulong sNewStep)
    // Bien
    return 1;
 }
+
+// ------------------------------------------------------------------------------------------------------------------------ //
+// ---------------------------------------------- HORIZONTAL LINES ZERO ZONE ---------------------------------------------- //
+// ------------------------------------------------------------------------------------------------------------------------ //
+//+------------------------------------------------------------------+
+//| Create the horizontal line                                       |
+//+------------------------------------------------------------------+
+short CreateHZerolines(int iThread)
+{
+   color clr=clrRed;
+   string lname;
+   // Borrar lineas previas
+   if(!ClearPrevLines()) return -1;
+   // Create line support
+   lname="BotTrendSupport";
+   if (!HLineCreate(lname,dLPRICE[iThread],clr)) return -1;
+   lname="BotTrendResistence";
+   clr=clrLawnGreen;
+   if (!HLineCreate(lname,dHPRICE[iThread],clr)) return -1;
+   return 1;
+}
+
+short MovehLineLevelTest()
+{
+   long chart_ID=0;
+   double dlniprice =0;
+   string lname;
+   // Check BotTrendSupport line
+   lname="BotTrendSupport";
+   dlniprice=SymbolInfoDouble(Symbol(),SYMBOL_BID);
+   dlniprice-=(700*pips);
+   if (!HLineMove(lname,0,dlniprice)) return -1;
+   
+   lname="BotTrendResistence";
+   dlniprice=SymbolInfoDouble(Symbol(),SYMBOL_BID);
+   dlniprice+=(700*pips);
+   if (!HLineMove(lname,0,dlniprice)) return -1;
+   // Bien
+   return 1;
+}
+
+short ClearPrevLines()
+{
+   long chart_ID=0;
+   int ifound=0;
+   string lname;
+   // Check BotTrendSupport line
+   lname="BotTrendSupport";
+   ifound=ObjectFind(chart_ID,lname);
+   if(ifound>-1) 
+   {
+      if(!HLineDelete(chart_ID,lname)) return -1;
+   } 
+   // Check BotTrendResistence line
+   lname="BotTrendResistence";
+   ifound=ObjectFind(chart_ID,lname);
+   if(ifound>-1) 
+   {
+      if(!HLineDelete(chart_ID,lname)) return -1;
+   }   
+   // Bien
+   return 1;
+}
+
+bool HLineCreate(string name,double price,color clr=clrRed)
+   {
+   long            chart_ID=0;        // chart's ID
+   int             sub_window=0;       // subwindow index
+   ENUM_LINE_STYLE style=STYLE_SOLID;  // line style
+   int             width=2;           // line width
+   bool            back=false;         // in the background
+   bool            selection=false;    // highlight to move
+   bool            hidden=true;        // hidden in the object list
+   long            z_order=0; 
+   //--- if the price is not set, set it at the current Bid price level
+   if(!price) price=SymbolInfoDouble(Symbol(),SYMBOL_BID);
+   //--- reset the error value
+   ResetLastError();
+   //--- create a horizontal line
+   if(!ObjectCreate(chart_ID,name,OBJ_HLINE,sub_window,0,price))
+   {
+      vtext=__FUNCTION__+":Se ha producido el error "+IntegerToString(GetLastError())+" al crear linea de niveles de bot.";
+      ENUMTXT = PRINT;
+      expertLog();
+      return(false);
+   }
+   //--- set line color
+   ObjectSetInteger(chart_ID,name,OBJPROP_COLOR,clr);
+   //--- set line display style
+   ObjectSetInteger(chart_ID,name,OBJPROP_STYLE,style);
+   //--- set line width
+   ObjectSetInteger(chart_ID,name,OBJPROP_WIDTH,width);
+   //--- display in the foreground (false) or background (true)
+   ObjectSetInteger(chart_ID,name,OBJPROP_BACK,back);
+   //--- enable (true) or disable (false) the mode of moving the line by mouse
+   //--- when creating a graphical object using ObjectCreate function, the object cannot be
+   //--- highlighted and moved by default. Inside this method, selection parameter
+   //--- is true by default making it possible to highlight and move the object
+   ObjectSetInteger(chart_ID,name,OBJPROP_SELECTABLE,selection);
+   ObjectSetInteger(chart_ID,name,OBJPROP_SELECTED,selection);
+   //--- hide (true) or display (false) graphical object name in the object list
+   ObjectSetInteger(chart_ID,name,OBJPROP_HIDDEN,hidden);
+   //--- set the priority for receiving the event of a mouse click in the chart
+   ObjectSetInteger(chart_ID,name,OBJPROP_ZORDER,z_order);
+   //--- successful execution
+   return(true);
+  }
+//+------------------------------------------------------------------+
+//| Check if lines was moved by user.Update nivel values             |
+//| Confirm Resistence allways is 2TP upper than support             |
+//+------------------------------------------------------------------+
+bool HLineCheckMoved()
+{
+   double diff;
+   for(int i=0;i<9;i++)
+   {
+      // Llamada hilos 
+      diff=MathAbs(dLOTBear[i]+dLOTBULL[i]);
+      if(diff>(0))
+      {
+         HLineCheckMovedThread(i);
+      }  
+   }
+   //--- successful execution
+   return(true);
+}
+
+bool HLineCheckMovedThread(int iThread)
+{
+   long chart_ID=0;
+   double dDiff,dHlinesup,dHlineres=0;
+   string lname;
+   int ifound;
+   // Check BotTrendSupport line
+   lname="BotTrendSupport";
+   dHlinesup=0;
+   ifound=ObjectFind(chart_ID,lname);
+   if(ifound>-1) 
+   {
+      dHlinesup=ObjectGetDouble(chart_ID,lname,OBJPROP_PRICE);
+      if(dHlinesup<0) return(false);
+   }
+   lname="BotTrendResistence";
+   ifound=ObjectFind(chart_ID,lname);
+   if(ifound>-1) 
+   {
+      dHlineres=ObjectGetDouble(chart_ID,lname,OBJPROP_PRICE);
+      if(dHlineres<0) return(false);
+   }
+   if(ifound<0) return(true);
+   // Check Diff mayor than 2TP
+   dDiff=dHlineres-dHlinesup;
+   // TEST if(dDiff>(3*TakeProfit*pips))
+   if(dDiff<(3*TakeProfit*pips))
+   {
+      vtext=__FUNCTION__+":Control de niveles incorrecto. Mínima diferencia de PIPS:"+DoubleToString((3*TakeProfit*pips));
+      ENUMTXT = PRINT;
+      expertLog();
+      // Reset lines to old bot value
+      if(!HLineMove("BotTrendSupport",chart_ID,dLPRICE[iThread])) return(false);
+      if(!HLineMove("BotTrendResistence",chart_ID,dHPRICE[iThread])) return(false);
+   }
+   // Asignar nuevos valores al bot
+   // TEST 
+   ///dHlinesup-= TakeProfit*pips;
+   if(dLPRICE[iThread]!=dHlinesup)
+   {
+      dLPRICE[iThread]=dHlinesup;
+      vtext=__FUNCTION__+":Cambio soporte de bot aceptado:"+DoubleToString(dHlinesup)+".";
+      ENUMTXT = PRINT;
+      expertLog();
+   }
+   // TEST 
+  /// dHlineres+= TakeProfit*pips;
+   if(dHPRICE[iThread]!=dHlineres)
+   {
+      dHPRICE[iThread]=dHlineres;
+      vtext=__FUNCTION__+":Cambio resistencia de bot aceptado:"+DoubleToString(dHlineres)+".";
+      ENUMTXT = PRINT;
+      expertLog();
+   }
+   //--- successful execution
+   return(true);
+} 
+  
+//+------------------------------------------------------------------+
+//| Move horizontal line                                             |
+//+------------------------------------------------------------------+
+bool HLineMove(string name,const long chart_ID=0,double price=0)      // line price
+  {
+   //--- if the line price is not set, move it to the current Bid price level
+   if(!price) price=SymbolInfoDouble(Symbol(),SYMBOL_BID);
+   //--- reset the error value
+   ResetLastError();
+   //--- move a horizontal line
+   if(!ObjectMove(chart_ID,name,0,0,price))
+   {
+      vtext=__FUNCTION__+":Se ha producido el error "+IntegerToString(GetLastError())+" al mover linea de niveles de bot.";
+      ENUMTXT = PRINT;
+      expertLog();
+      return false;
+   }
+   //--- successful execution
+   return(true);
+  }
+//+------------------------------------------------------------------+
+//| Delete a horizontal line                                         |
+//+------------------------------------------------------------------+
+bool HLineDelete(const long   chart_ID=0,   // chart's ID
+                 const string name="HLine") // line name
+  {
+   //--- reset the error value
+   ResetLastError();
+   //--- delete a horizontal line
+   if(!ObjectDelete(chart_ID,name))
+   {
+      vtext=__FUNCTION__+":Se ha producido el error "+IntegerToString(GetLastError())+" al borrar linea de niveles de bot.";
+      ENUMTXT = PRINT;
+      expertLog();
+      return false;
+     }
+   //--- successful execution
+   return(true);
+  }
+//              ------------------------------------------------------------------------------------------------------------------- //
+//              ----------------------------------------------- HORIZONTAL LINES ZERO ZONE ---------------------------------------- //
+//              ------------------------------------------------------------------------------------------------------------------- //
+
 
 //              ------------------------------------------------------------------------------------------------------------------- //
 //              ----------------------------------------------- ZERO GRAVITY CODE ------------------------------------------------------ //
