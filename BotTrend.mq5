@@ -448,7 +448,7 @@ short UpdateThreadPrices()
    }
    return 1;
 }
-
+// Hilos pequeños
 short UpdatePrices(int ithread,ulong lTicketEdge)
 {
    MqlRates rThreadBars[];
@@ -508,7 +508,7 @@ short UpdatePrices(int ithread,ulong lTicketEdge)
          dLPRICE[ithread]=dPOpen-ddiff;
       }
    }
-      // Only update if a valid edge op with profit.
+   // Only update if a valid edge op with profit.
    if(cPos.Profit()<0) return 0;
    dNow=TimeCurrent();
    // Check all bars since open edge
@@ -525,6 +525,8 @@ short UpdatePrices(int ithread,ulong lTicketEdge)
       if((TYPE_POS==POSITION_TYPE_SELL) && (dLPRICE[ithread]>rThreadBars[i].low)) 
       {
          dLPRICE[ithread]=rThreadBars[i].low;
+         // Actualiza lineas horizontales
+         if (!HLineMove("BotTrendSupport",0,dLPRICE[ithread])) return -1;
          vtext="UpdatePrices: Actualizado precio Bear:"+DoubleToString(dLPRICE[ithread]);
          ENUMTXT = PRINT;
          expertLog(); 
@@ -532,6 +534,8 @@ short UpdatePrices(int ithread,ulong lTicketEdge)
       if((TYPE_POS==POSITION_TYPE_BUY) && (dHPRICE[ithread]<rThreadBars[i].high)) 
       {
          dHPRICE[ithread]=rThreadBars[i].high;
+         // Actualiza lineas horizontales
+         if (!HLineMove("BotTrendResistence",0,dHPRICE[ithread])) return -1;
          vtext="UpdatePrices: Actualizado precio Bull:"+DoubleToString(dHPRICE[ithread]);
          ENUMTXT = PRINT;
          expertLog(); 
@@ -1366,6 +1370,10 @@ short CheckForOpen()
       dHPRICE[ifreepos]=SymbolInfo.Bid();
       dHPRICE[ifreepos]+=((TakeProfit+iFrancisca)*pips);
       dZeroOp[ifreepos] = 0; // Resetear valor de Zero.
+      // Clear Hlines
+      ClearPrevLines();
+      // TEST CREATE NIVEL LINES
+      if(CreateHZerolines(ifreepos)<0) return 0;
       switch(ENUMBARDIR)
       {
          case POSITION_TYPE_SELL:
@@ -1661,6 +1669,7 @@ int CheckNewStep()
          return -1;
       }  
    }
+   
    // Bien
    return 1;
 }
@@ -2067,7 +2076,7 @@ short EqualZeroThread(int ithread,ulong sZgravityStep)
             {
                // Asignar operación GZero
                dZeroOp[ithread]=lticket;
-               vtext="EqualZeroThread.Zona 0 en ticket:"+DoubleToString(dZeroOp[ithread]);
+               vtext="EqualZeroThread.Zona 0 en ticket:"+DoubleToString(dZeroOp[ithread],0);
                ENUMTXT = PRINT;
                expertLog();
                if(SetZeroLevelThread(ithread)<0) return -1;
