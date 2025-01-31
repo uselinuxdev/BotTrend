@@ -2425,6 +2425,8 @@ bool HLineCheckMovedThread(int iThread)
       // Reset lines to old bot value
       if(!HLineMove("BotTrendSupport",chart_ID,dLPRICE[iThread])) return(false);
       if(!HLineMove("BotTrendResistence",chart_ID,dHPRICE[iThread])) return(false);
+      dHlinesup=dLPRICE[iThread];
+      dHlineres=dHPRICE[iThread];
    }
    // Asignar nuevos valores al bot
    // TEST 
