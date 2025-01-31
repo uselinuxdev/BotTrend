@@ -239,7 +239,7 @@ void OnTick()
          if(CheckForOpen()<0) return;
       }
       // Check if user move ZeroZones
-      if(!HLineCheckMoved())  return;
+      if(!HLineCheckMoved()) ClearPrevLines();      
    }
    // BreakEvent en posiciones laterales iguales
    //--- go trading only for first ticks of new bar. Actual bar is the last array element
@@ -278,7 +278,7 @@ void LoadLicenceAccount()
    // Angela Recio (Carlos Sastre)
    ALOGINGOLD[7]=206969;
    // USE DEMO FUSION
-   ALOGINGOLD[8]=136747;
+   ALOGINGOLD[8]=142997;
    // Use ROBOFOREX
    ALOGINGOLD[9]=67013738;
      
@@ -506,6 +506,13 @@ short UpdatePrices(int ithread,ulong lTicketEdge)
       { // BULL EDGE
          dHPRICE[ithread]=dTP;
          dLPRICE[ithread]=dPOpen-ddiff;
+      }
+      // Pintar barras
+      if(CreateHZerolines(ithread)<0)
+      {
+         vtext=__FUNCTION__+": No se han podido pintar las lineas de soporte/resistencia del hilo.";
+         ENUMTXT = PRINT;
+         expertLog(); 
       }
    }
    // Only update if a valid edge op with profit.
@@ -1370,8 +1377,6 @@ short CheckForOpen()
       dHPRICE[ifreepos]=SymbolInfo.Bid();
       dHPRICE[ifreepos]+=((TakeProfit+iFrancisca)*pips);
       dZeroOp[ifreepos] = 0; // Resetear valor de Zero.
-      // Clear Hlines
-      ClearPrevLines();
       // TEST CREATE NIVEL LINES
       if(CreateHZerolines(ifreepos)<0) return 0;
       switch(ENUMBARDIR)
@@ -2324,7 +2329,7 @@ bool HLineCreate(string name,double price,color clr=clrRed)
    ENUM_LINE_STYLE style=STYLE_SOLID;  // line style
    int             width=2;           // line width
    bool            back=false;         // in the background
-   bool            selection=false;    // highlight to move
+   bool            selection=true;    // highlight to move
    bool            hidden=true;        // hidden in the object list
    long            z_order=0; 
    //--- if the price is not set, set it at the current Bid price level
@@ -2383,26 +2388,32 @@ bool HLineCheckMoved()
 bool HLineCheckMovedThread(int iThread)
 {
    long chart_ID=0;
+   color clr=clrRed;
    double dDiff,dHlinesup,dHlineres=0;
    string lname;
    int ifound;
+   // Si no se han definido limites salirse
+   if((dLPRICE[iThread]<=0) || (dHPRICE[iThread]<=0) || (dLPRICE[iThread]>dHPRICE[iThread])) return false;
    // Check BotTrendSupport line
    lname="BotTrendSupport";
    dHlinesup=0;
    ifound=ObjectFind(chart_ID,lname);
-   if(ifound>-1) 
+   // Crearla
+   if(ifound<0) 
    {
-      dHlinesup=ObjectGetDouble(chart_ID,lname,OBJPROP_PRICE);
-      if(dHlinesup<0) return(false);
+      if (!HLineCreate(lname,dLPRICE[iThread],clr)) return(false);
    }
+   dHlinesup=ObjectGetDouble(chart_ID,lname,OBJPROP_PRICE);
+   if(dHlinesup<0) return(false);
    lname="BotTrendResistence";
+   clr=clrLawnGreen;
    ifound=ObjectFind(chart_ID,lname);
-   if(ifound>-1) 
+   if(ifound<0) 
    {
-      dHlineres=ObjectGetDouble(chart_ID,lname,OBJPROP_PRICE);
-      if(dHlineres<0) return(false);
+      if (!HLineCreate(lname,dHPRICE[iThread],clr)) return(false);
    }
-   if(ifound<0) return(true);
+   dHlineres=ObjectGetDouble(chart_ID,lname,OBJPROP_PRICE);
+   if(dHlineres<0) return(false);
    // Check Diff mayor than 2TP
    dDiff=dHlineres-dHlinesup;
    // TEST if(dDiff>(3*TakeProfit*pips))
