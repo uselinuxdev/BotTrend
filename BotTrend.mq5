@@ -2417,9 +2417,9 @@ bool HLineCheckMovedThread(int iThread)
    // Check Diff mayor than 2TP
    dDiff=dHlineres-dHlinesup;
    // TEST if(dDiff>(3*TakeProfit*pips))
-   if(dDiff<(3*TakeProfit*pips))
+   if(dDiff<(2*TakeProfit*pips))
    {
-      vtext=__FUNCTION__+":Control de niveles incorrecto. Mínima diferencia de PIPS:"+DoubleToString((3*TakeProfit*pips));
+      vtext=__FUNCTION__+":Control de niveles incorrecto. Mínima diferencia de PIPS:"+DoubleToString((2*TakeProfit*pips));
       ENUMTXT = PRINT;
       expertLog();
       // Reset lines to old bot value
