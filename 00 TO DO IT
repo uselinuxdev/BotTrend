@@ -2,6 +2,7 @@
 // VERSION 8.80
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 - Revisar función de salida con beneficios: Valor operarión actual - apertura - 0.20cent op.
+- Función breakEvent no tener encuenta sl/tp para cálculo de lote: Poder poner TP en bot.
 - Cuando se genera un break matar las operationes en dirección contraria. Así tiene que ir menos en la dirección break.
 	- Matar todas.
 	- Matar sólo las GZ-1?.
