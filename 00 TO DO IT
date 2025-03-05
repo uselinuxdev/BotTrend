@@ -1,7 +1,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // VERSION 8.80
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-- Calculo de impulso anulado 10h: Coge el sentimiento de almenos 2 mercados para cálculo de límites.
+- Calculo de impulso anulado 10h: Coge el sentimiento de almenos 2 mercados para cálculo de límites. Hacerlo con parámetro configurable.
 - Revisar función de salida con beneficios: Valor operarión actual - apertura - 0.20cent op.
 - Función SL sólo para las operaciones G1 control con función siguiente.
 - Cuando se genera un break matar las operationes en dirección contraria. Así tiene que ir menos en la dirección break.
