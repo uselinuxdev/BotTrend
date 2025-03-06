@@ -213,7 +213,7 @@ void OnTick()
    // Every ticks Check Franciscada
    if(goFrancisca()<0) return;
    // Comprobar hilo en beneficios PRD code
-   //////////////////////////////////////////////////////////////if(CheckAllThreadProfit()<0) return;   
+   if(CheckAllThreadProfit()<0) return;   
    //// Check for new steps // EN PROD PONER CADA TICK
    if(CheckNewStep()<0) return;
    // Igualar hilo G 0
@@ -232,7 +232,7 @@ void OnTick()
       // 8.25 funtion. Upload prices limits every minute. SÃ³lo hilos pequeÃ±os
       if(UpdateThreadPrices()<0) return;
       // Comprobar hilo en beneficios TEST code
-      if(CheckAllThreadProfit()<0) return;
+      /////////////////////////if(CheckAllThreadProfit()<0) return;
       // Abrir cada minuto
       if((MarketClosing()!=0) && (BotVacation()!=0))
       {
@@ -1101,13 +1101,13 @@ short CheckThreadProfit(int ithread)
             continue;
          }
          dhandicap+=getComisionPos();
-         dhandicap+=cPos.Swap();  
+         //dhandicap+=cPos.Swap();  // Aparece el el profit directamente no contar 2 veces.
          // Control por ops abiertas
          dProfitOp+=cPos.Profit();
          // Por cada op 25 cnts
          dProfitOp+=dOpadd;
          dProfitOp+=getComisionPos();
-         dProfitOp+=cPos.Swap(); 
+         //dProfitOp+=cPos.Swap();  // Aparece el el profit directamente no contar 2 veces.
       }        
    }
    // Bien
@@ -2419,7 +2419,7 @@ bool HLineCheckMovedThread(int iThread)
    // TEST if(dDiff>(3*TakeProfit*pips))
    if(dDiff<(2*TakeProfit*pips))
    {
-      vtext=__FUNCTION__+":Control de niveles incorrecto. Mínima diferencia de PIPS:"+DoubleToString((2*TakeProfit*pips));
+      vtext=__FUNCTION__+":Control de niveles incorrecto. Mínima diferencia de PIPS:"+DoubleToString((3*TakeProfit*pips));
       ENUMTXT = PRINT;
       expertLog();
       // Reset lines to old bot value
