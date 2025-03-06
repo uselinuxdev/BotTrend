@@ -1062,6 +1062,7 @@ short CheckThreadProfit(int ithread)
    double dProfitOp=0; // Control del profit de las operaciones actuales
    double dOpadd=-0.25; // add 0.25 by op.
    ulong lticket=0;
+   double dcurrentvalue=0;
    
    // Coger el valor mÃÂ­nimo con el que el usuario asume salirse
    dhandicap=(iExitProfitStep*(-1));
@@ -1103,7 +1104,8 @@ short CheckThreadProfit(int ithread)
          dhandicap+=getComisionPos();
          //dhandicap+=cPos.Swap();  // Aparece el el profit directamente no contar 2 veces.
          // Control por ops abiertas
-         dProfitOp+=cPos.Profit();
+         dcurrentvalue=cPos.Profit();
+         dProfitOp+=dcurrentvalue;
          // Por cada op 25 cnts
          dProfitOp+=dOpadd;
          dProfitOp+=getComisionPos();
