@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2020, Usefilm Corp."
 #property link      "https://www.mql5.com"
-#define VERSION "8.75"
+#define VERSION "8.80"
 #property version VERSION
 
 // InclusiÃÂ³n de objetos de liberia estandar
@@ -115,6 +115,7 @@ input double   TakeProfit=60;
 input double   dComisionLot=2;
 int iComisionPips=0;
 input int      iExitProfitStep=2;
+input bool     bSumSwapExistProfit=false;
 input int      iMaxThead=1;
 input bool     bSoftFriday=true;
 input bool     bHollidays=true;
@@ -213,7 +214,7 @@ void OnTick()
    // Every ticks Check Franciscada
    if(goFrancisca()<0) return;
    // Comprobar hilo en beneficios PRD code
-   if(CheckAllThreadProfit()<0) return;   
+   //////////////////////////////////////if(CheckAllThreadProfit()<0) return;   
    //// Check for new steps // EN PROD PONER CADA TICK
    if(CheckNewStep()<0) return;
    // Igualar hilo G 0
@@ -232,7 +233,7 @@ void OnTick()
       // 8.25 funtion. Upload prices limits every minute. SÃ³lo hilos pequeÃ±os
       if(UpdateThreadPrices()<0) return;
       // Comprobar hilo en beneficios TEST code
-      /////////////////////////if(CheckAllThreadProfit()<0) return;
+      if(CheckAllThreadProfit()<0) return;
       // Abrir cada minuto
       if((MarketClosing()!=0) && (BotVacation()!=0))
       {
@@ -246,8 +247,8 @@ void OnTick()
    // rCurrent tiene las barras definidas en parametro. Ultimo de array barra actual.
    if(rCurrent[piNumBars-1].tick_volume<5)
    { 
-      // Poner SL G0
-      if(SetStopLostG0()<0) return;
+      // Poner SL G1
+      if(SetStopLostG1()<0) return;
       // Contar ops.
       if(countbot()<0) return;
       // Actualiza panel 
@@ -601,7 +602,7 @@ short SetZeroLevelThread(int iThread)
 {
    MqlRates rLastBars[];
    // Hacerlo con 5min (12(60/5) * 24h)
-   //int iPeriodos=24;
+   //int iPeriodos=24;int iPeriodos=288;
    int iPeriodos=288;
    SymbolInfo.Name(_Symbol);
    SymbolInfo.Refresh();
@@ -1059,7 +1060,6 @@ short CheckAllThreadProfit()
 short CheckThreadProfit(int ithread)
 {
    double dhandicap=0;
-   double dProfitOp=0; // Control del profit de las operaciones actuales
    double dOpadd=-0.25; // add 0.25 by op.
    ulong lticket=0;
    double dcurrentvalue=0;
@@ -1067,7 +1067,7 @@ short CheckThreadProfit(int ithread)
    // Coger el valor mÃÂ­nimo con el que el usuario asume salirse
    dhandicap=(iExitProfitStep*(-1));
    // Si estÃÂ¡ en apertura de mercado contar sÃÂ³lo el 50% de ganancias
-   if(bOpenMarket)
+   if(bOpenMarket==false)
    {
       dhandicap=(dhandicap/2);
    }
@@ -1085,9 +1085,9 @@ short CheckThreadProfit(int ithread)
       if(lticket==0)
       {
          i=99;
-         // Ya tengo todos los hadicap. Equity tiene encuenta las operaciones contando SWAP
+         // Ya tengo todos los hadicap.
          dhandicap=Cacc.Equity()+dhandicap;
-         if(dhandicap>ATRENDPROFIT[ithread] || dProfitOp>iExitProfitStep)
+         if(dhandicap>(ATRENDPROFIT[ithread]))
          {
             return CloseThisThread(ithread);
          }
@@ -1102,14 +1102,11 @@ short CheckThreadProfit(int ithread)
             continue;
          }
          dhandicap+=getComisionPos();
+         dhandicap+=dOpadd;
+         if(bSumSwapExistProfit) dhandicap+=cPos.Swap();
          //dhandicap+=cPos.Swap();  // Aparece el el profit directamente no contar 2 veces.
          // Control por ops abiertas
          dcurrentvalue=cPos.Profit();
-         dProfitOp+=dcurrentvalue;
-         // Por cada op 25 cnts
-         dProfitOp+=dOpadd;
-         dProfitOp+=getComisionPos();
-         //dProfitOp+=cPos.Swap();  // Aparece el el profit directamente no contar 2 veces.
       }        
    }
    // Bien
@@ -1170,7 +1167,7 @@ short CloseThisThread(int ithread)
 }
 
 // Pondrá SL en las operaciones G0.Después de evaluar los límites diarios. Si hay diferencia de lote de hilo
-short SetStopLostG0()
+short SetStopLostG1()
 {
    ulong sZgravityStep;
    double diff=0;
@@ -1202,7 +1199,7 @@ short SetStopLostThread(int iThread, ulong sZgravityStep)
    
       MqlRates rLastBars[];
    // Hacerlo con 5min (12(60/5) * 24h)
-   //int iPeriodos=24;
+   //int iPeriodos=12;
    int iPeriodos=288;
    SymbolInfo.Name(_Symbol);
    SymbolInfo.Refresh();
@@ -1259,15 +1256,15 @@ short SetStopLostThread(int iThread, ulong sZgravityStep)
          // Control de SL
          dOpen=cPos.PriceOpen();
          dCurrent=cPos.PriceCurrent();
-         // Sólo poner SL en operaciones G0 y G1
-         if(lstep<sZgravityStep) continue;
+         // Sólo poner SL en operaciones G1
+         if(lstep<(sZgravityStep+1)) continue;
          // Control de hilo en esa dir.
          if(TYPE_POS==POSITION_TYPE_SELL)
          {
             dNewSL=dOpen-(TakeProfit*pips);
             if(dNewSL<dresistence) continue;
             // Actualizar resistencia con SL + 2 iFranciscas
-            dLPRICE[iThread] = dNewSL -(2*iFrancisca*pips);
+            dLPRICE[iThread] = dNewSL - (TakeProfit*pips);
             vtext="SetStopLostThread actualiza precio de soporte de hilo:"+DoubleToString(dLPRICE[iThread]);
             ENUMTXT = PRINT;
             expertLog();
@@ -1277,7 +1274,7 @@ short SetStopLostThread(int iThread, ulong sZgravityStep)
             dNewSL=dOpen+(TakeProfit*pips);
             if(dNewSL>dsuport) continue;
             // Actualizar soporte con SL + 2 iFranciscas
-            dHPRICE[iThread] = dNewSL - (2*iFrancisca*pips);
+            dHPRICE[iThread] = dNewSL + (TakeProfit*pips);
             vtext="SetStopLostThread actualiza precio de resistencia de hilo:"+DoubleToString(dHPRICE[iThread]);
             ENUMTXT = PRINT;
             expertLog();
@@ -2177,6 +2174,12 @@ short BreakZeroThread(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE TYPE_PO
          // Dependiendo de la ruptura duplicar 1 u otro lote
          if(TYPE_POS==POSITION_TYPE_SELL)
          {
+            // Control de operación killed para tener el doble de lo de antes
+            if(dLOTBULL[iThread]<=0) 
+            {
+               //Valor de operación seleccionada
+               dLOTBULL[iThread]=cPos.Volume();
+            }
             dNewLot=((dLOTBULL[iThread]*2)-dLOTBear[iThread]);
             dNewLot=NormalizeDouble(dNewLot,lotdecimal);
             // Control de 0 Lots. Si ya es doble en esa direcciÃÂ³n no hacer mÃÂ¡s ops
@@ -2187,6 +2190,12 @@ short BreakZeroThread(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE TYPE_PO
          }
          else
          { // New op tipo BULL
+            // Control de operación killed para tener el doble de lo de antes
+            if(dLOTBear[iThread]<=0) 
+            {
+               //Valor de operación seleccionada
+               dLOTBear[iThread]=cPos.Volume();
+            }
             dNewLot=((dLOTBear[iThread]*2)-dLOTBULL[iThread]);
             dNewLot=NormalizeDouble(dNewLot,lotdecimal);
             // Control de 0 Lots.
@@ -2195,15 +2204,58 @@ short BreakZeroThread(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE TYPE_PO
             ENUMTXT = PRINT;
             expertLog();   
          }
-         // Create new op to doble dir.
-        return CreateOpZero(TYPE_POS,dNewLot,lNewstep);
+        // Create new op to doble dir.
+        if(CreateOpZero(TYPE_POS,dNewLot,lNewstep)<0) return -1;
+        // Kill ticket no G0 contrarios a break (G<0 and G1)
+        if(KillG1invertBreak(iThread,sZgravityStep,TYPE_POS)<0) return -1;
       }
    }
    
    // Bien
    return 1;
 }
-// 
+// La llamada a esta función mata operarciones en dirección contraria de break (todas menos G0).
+short KillG1invertBreak(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE BREAKDIR)
+{
+   ulong lticket;
+   int ithreadOp=0;
+   ulong lstep;
+   string scomment;
+   ENUM_POSITION_TYPE TYPE_POS;
+    
+   for(int i=0;i<PositionsTotal();i++) // returns the number of current positions
+   {
+      if(!cPos.SelectByIndex(i))
+      {
+         Print("Error al seleccionar orden. Error = ",GetLastError());
+         return -1;
+      }
+      if(_Symbol!=cPos.Symbol()) continue; 
+      ithreadOp=(int)cPos.Magic()-MAGICTREND;
+      if(ithreadOp!=iThread) continue;
+      lticket=cPos.Ticket();
+      scomment=cPos.Comment();
+      TYPE_POS=cPos.PositionType();
+      lstep=GetStep(scomment);
+      // Kill all minus G0.
+      ///////if(lstep==sZgravityStep) continue;
+      // Sólo direción contraria al break
+      if(BREAKDIR==TYPE_POS) continue;
+      if(!cTrade.PositionClose(lticket))
+      {
+         vtext=__FUNCTION__+":Error al cerrar el ticket "+IntegerToString(lticket)+" error:"+IntegerToString(GetLastError());
+         ENUMTXT = PRINT;
+         expertLog();
+         return -1;
+      }
+      // Log ticket borrado
+      vtext=__FUNCTION__+":Cerrado ticket "+IntegerToString(lticket)+" dirección contraria a BREAK.";
+      ENUMTXT = PRINT;
+      expertLog();    
+   }
+   // Bien
+   return 1;
+}
 
 // Nuevas operaciones ZeroGravity. Se le pasa el tipo,lote y step q se crearÃÂ¡
 short CreateOpZero(ENUM_POSITION_TYPE TYPE_POS,double dZeroLot,ulong sNewStep)
