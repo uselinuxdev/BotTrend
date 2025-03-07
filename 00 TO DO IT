@@ -4,7 +4,7 @@
 - Calculo de impulso anulado 12h: 
 	- Coge el sentimiento de almenos 2 mercados para cálculo de límites. Hacerlo con parámetro configurable.
 	- Si hay una operación inferior a ese valor será esa operación +- iTP en dirección de esea OP.
-- Revisar función de salida con beneficios: Valor operarión actual - apertura - 0.20cent op. (Quitado SWAP al estar en el valor profit)  <-- OK
+- Revisar función de salida con beneficios: Valor operarión actual - apertura - 0.20cent op. (Parametro boleano)  <-- OK
 - Función SL: <-- OK
 	Sólo para las operaciones G1 control con función siguiente. <-- OK
 	Subir soporte resistencia a nuevo SL + 1TP. Intentar que no vuelva a crear esa operación en vuelta de mercado. <-- OK
