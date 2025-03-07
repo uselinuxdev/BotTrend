@@ -2,7 +2,7 @@
 // VERSION 8.80
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 - Calculo de impulso anulado 12h: <-- OK
-	- Coge el sentimiento de almenos 2 mercados para cálculo de límites. Hacerlo con parámetro configurable.
+	- Coge el sentimiento de almenos 2 mercados para cálculo de límites. Hacerlo con parámetro configurable. <-- OK
 	- Si hay una operación inferior a ese valor será esa operación +- iTP en dirección de esea OP.
 - Revisar función de salida con beneficios: Valor operarión actual - apertura - 0.20cent op. (Parametro boleano)  <-- OK
 - Función SL: <-- OK
