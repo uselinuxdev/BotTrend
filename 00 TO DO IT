@@ -8,9 +8,9 @@
 - Función SL: <-- OK
 	Sólo para las operaciones G1 control con función siguiente. <-- OK
 	Subir soporte resistencia a nuevo SL + 1TP. Intentar que no vuelva a crear esa operación en vuelta de mercado. <-- OK
-- Cuando se genera un break matar las operationes en dirección contraria. Así tiene que ir menos en la dirección break.
-	- Matar todas.
-	- Matar todas menos las G0??.
+- Cuando se genera un break matar las operationes en dirección contraria. Así tiene que ir menos en la dirección break. <-- OK
+	- Matar todas. <-- OK
+	- Matar todas menos las G0??. <-- OK Tested mejor matar todas.
 - Función breakEvent no tener encuenta sl/tp para cálculo de lote: Poder poner TP en bot.
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
