@@ -115,7 +115,7 @@ input double   TakeProfit=60;
 input double   dComisionLot=2;
 int iComisionPips=0;
 input int      iExitProfitStep=2;
-input bool     bSumSwapExistProfit=false;
+input bool     bSumSwapExistProfit=true;
 input int      iMaxThead=1;
 input bool     bSoftFriday=true;
 input bool     bHollidays=true;
@@ -248,7 +248,7 @@ void OnTick()
    if(rCurrent[piNumBars-1].tick_volume<5)
    { 
       // Poner SL G1
-      if(SetStopLostG1()<0) return;
+      if(SetStopLostG0()<0) return;
       // Contar ops.
       if(countbot()<0) return;
       // Actualiza panel 
@@ -1167,7 +1167,7 @@ short CloseThisThread(int ithread)
 }
 
 // Pondrá SL en las operaciones G0.Después de evaluar los límites diarios. Si hay diferencia de lote de hilo
-short SetStopLostG1()
+short SetStopLostG0()
 {
    ulong sZgravityStep;
    double diff=0;
@@ -1256,8 +1256,8 @@ short SetStopLostThread(int iThread, ulong sZgravityStep)
          // Control de SL
          dOpen=cPos.PriceOpen();
          dCurrent=cPos.PriceCurrent();
-         // Sólo poner SL en operaciones G1
-         if(lstep<(sZgravityStep+1)) continue;
+         // Sólo poner SL en operaciones G0
+         if(lstep<(sZgravityStep)) continue;
          // Control de hilo en esa dir.
          if(TYPE_POS==POSITION_TYPE_SELL)
          {
@@ -2045,7 +2045,7 @@ short EqualZeroThread(int ithread,ulong sZgravityStep)
             TYPE_Break=POSITION_TYPE_SELL;
             dNewLot=(dLOTBULL[ithread]-dLOTBear[ithread]);
             dNewLot=NormalizeDouble(dNewLot,lotdecimal);
-            return CreateOpZero(TYPE_Break,dNewLot,sZgravityStep);
+            if(CreateOpZero(TYPE_Break,dNewLot,sZgravityStep)<0) return -1;
          }
          // Con el ZeroZone +- 1TP
          ////////////////////////////////////////////////dZeroTypePrice=dZeroPRICE[ithread]+(TakeProfit*pips);
@@ -2054,7 +2054,7 @@ short EqualZeroThread(int ithread,ulong sZgravityStep)
             TYPE_Break=POSITION_TYPE_BUY;
             dNewLot=(dLOTBear[ithread]-dLOTBULL[ithread]);
             dNewLot=NormalizeDouble(dNewLot,lotdecimal);
-            return CreateOpZero(TYPE_Break,dNewLot,sZgravityStep);       
+            if(CreateOpZero(TYPE_Break,dNewLot,sZgravityStep)<0) return -1;      
          }
          return 1;
       }
@@ -2206,8 +2206,8 @@ short BreakZeroThread(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE TYPE_PO
          }
         // Create new op to doble dir.
         if(CreateOpZero(TYPE_POS,dNewLot,lNewstep)<0) return -1;
-        // Kill ticket no G0 contrarios a break (G<0 and G1)
-        if(KillG1invertBreak(iThread,sZgravityStep,TYPE_POS)<0) return -1;
+        // Kill ticket no< G0 
+        if(KillG0invertBreak(iThread,sZgravityStep,TYPE_POS)<0) return -1;  
       }
    }
    
@@ -2215,7 +2215,7 @@ short BreakZeroThread(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE TYPE_PO
    return 1;
 }
 // La llamada a esta función mata operarciones en dirección contraria de break (todas menos G0).
-short KillG1invertBreak(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE BREAKDIR)
+short KillG0invertBreak(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE BREAKDIR)
 {
    ulong lticket;
    int ithreadOp=0;
@@ -2238,7 +2238,7 @@ short KillG1invertBreak(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE BREAK
       TYPE_POS=cPos.PositionType();
       lstep=GetStep(scomment);
       // Kill all minus G0.
-      ///////if(lstep==sZgravityStep) continue;
+      if(lstep!=sZgravityStep) continue;
       // Sólo direción contraria al break
       if(BREAKDIR==TYPE_POS) continue;
       if(!cTrade.PositionClose(lticket))
