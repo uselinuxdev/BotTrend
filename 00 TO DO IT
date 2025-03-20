@@ -1,7 +1,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // VERSION 8.80
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-- Calculo de impulso anulado 12h: <-- OK
+- Calculo de impulso anulado 24h:
 	- Coge el sentimiento de almenos 2 mercados para cálculo de límites. Hacerlo con parámetro configurable. <-- OK
 	- Si hay una operación inferior a ese valor será esa operación +- iTP en dirección de esea OP.
 - Revisar función de salida con beneficios: Valor operarión actual - apertura - 0.20cent op. (Parametro boleano)  <-- OK
@@ -9,8 +9,7 @@
 	Sólo para las operaciones G1 control con función siguiente. <-- OK
 	Subir soporte resistencia a nuevo SL + 1TP. Intentar que no vuelva a crear esa operación en vuelta de mercado. <-- OK
 - Cuando se genera un break matar las operationes en dirección contraria. Así tiene que ir menos en la dirección break. <-- OK
-	- Matar todas. <-- OK
-	- Matar todas menos las G0??. <-- OK Tested mejor matar todas.
+	- Matar todas menos las G0. 
 - Función breakEvent no tener encuenta sl/tp para cálculo de lote: Poder poner TP en bot.
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
