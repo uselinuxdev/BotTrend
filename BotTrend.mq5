@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2020, Usefilm Corp."
 #property link      "https://www.mql5.com"
-#define VERSION "8.80"
+#define VERSION "8.90"
 #property version VERSION
 
 // InclusiÃÂ³n de objetos de liberia estandar
@@ -1615,7 +1615,7 @@ int CheckNewStep()
       lNewStep=lstep+1;
       // Esta Función llega hasta G0 -1.
       // Poner Nuevos SL/TP del hilo
-      if(lstep>=(sZgravityStep-1))
+      if(lstep>=(sZgravityStep))
       {
          enumbotmode=ZERO_GRAVITY;
          vtext="Gravedad 0 activada.";
@@ -1631,6 +1631,11 @@ int CheckNewStep()
       {     
          // Original Venta
          dNextScalp=(dHPRICE[ipos]+(iFrancisca*pips));
+         // Si es la primera G0 añadir 1TP
+         if(lNewStep==(sZgravityStep)) 
+         {
+            dNextScalp+=(TakeProfit*pips);
+         }
          if(dPriceNow<dNextScalp) continue; 
          dnewprice=NormalizeDouble(SymbolInfo.Bid(),Digits());
          // Asignar el numero mÃÂ¡gico 
@@ -1638,8 +1643,6 @@ int CheckNewStep()
          dNewTP=MathAbs(dpricestep-dnewprice);  
          // 1 Generar nueva posciÃÂ³n en dir contraria
          dNewTP=NormalizeDouble(dnewprice+dNewTP+dCommOpen+(iFrancisca*2*pips),Digits());
-         // Comprobar precio en zona verde
-         dNewTP=GetGreenPrice(dNewTP,POSITION_TYPE_BUY);
          dSL=NewStep(dNewTP,lNewStep,sZgravityStep,scomment,POSITION_TYPE_BUY,lMagic);
          // Continue si NewStep es 0
          if(dSL==0) continue;
@@ -1650,6 +1653,11 @@ int CheckNewStep()
       {
          // Original Compra
          dNextScalp=(dLPRICE[ipos]-(iFrancisca*pips));
+         // Si es la primera G0 añadir 1TP
+         if(lNewStep==(sZgravityStep))
+         {
+            dNextScalp-=(TakeProfit*pips);
+         }
          if(dPriceNow>dNextScalp) continue;
          // Asignar el numero mÃÂ¡gico 
          cTrade.SetExpertMagicNumber(lMagic);  
@@ -1657,7 +1665,6 @@ int CheckNewStep()
          dNewTP=MathAbs(dpricestep-dnewprice);  
          // 1 Generar nueva posciÃÂ³n
          dNewTP=NormalizeDouble(dnewprice-dNewTP-dCommOpen-(iFrancisca*2*pips),Digits());
-         dNewTP=GetGreenPrice(dNewTP,POSITION_TYPE_SELL);
          dSL=NewStep(dNewTP,lNewStep,sZgravityStep,scomment,POSITION_TYPE_SELL,lMagic);
          // Continue si NewStep es 0
          if(dSL==0) continue;
@@ -2076,7 +2083,7 @@ short EqualZeroThread(int ithread,ulong sZgravityStep)
          if(lstep>=(sZgravityStep-1)) 
          {
             // FunciÃ³n para identificar el nivel 0. Si no se ha definido/reseteado bot.
-            if(dZeroOp[ithread]<=0) 
+            if((dHPRICE[ithread]<=0) || (dHPRICE[ithread]<=0))
             {
                // Asignar operación GZero
                dZeroOp[ithread]=lticket;
@@ -2238,7 +2245,7 @@ short KillG0invertBreak(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE BREAK
       TYPE_POS=cPos.PositionType();
       lstep=GetStep(scomment);
       // Kill all minus G0.
-      if(lstep!=sZgravityStep) continue;
+      if(lstep>=sZgravityStep) continue;
       // Sólo direción contraria al break
       if(BREAKDIR==TYPE_POS) continue;
       if(!cTrade.PositionClose(lticket))
@@ -2553,12 +2560,19 @@ bool HLineDelete(const long   chart_ID=0,   // chart's ID
 //              ----------------------------------------------- ZERO GRAVITY CODE ------------------------------------------------------ //
 //              ------------------------------------------------------------------------------------------------------------------- //
 
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////// NEW DEVS
+
+///////////////////////////// DEPRECIDED FUNTIONS
+
 // ------------------------------------------------------------------------------------------------------------------- //
 // ---------------------------------------------- GREEN CODE --------------------------------------------------------- //
 // ------------------------------------------------------------------------------------------------------------------- //
 
 // Se le pasa el precio del proximo scalp y se ajusta para no estar en zonas cercanas a 0 0 a 50 pips.
-double GetGreenPrice(double dNewPrice,ENUM_POSITION_TYPE TYPE_POS)
+double GetGreenPriced(double dNewPrice,ENUM_POSITION_TYPE TYPE_POS)
 {
    // Para la mayorÃÂ­a de pares de divisas 1 pip es 0.00001; para pares de divisas con el Yen JaponÃÂ©s como EUR/JPY 1 pip es 0.001
    double dCalc=0;
@@ -2600,9 +2614,3 @@ double GetGreenPrice(double dNewPrice,ENUM_POSITION_TYPE TYPE_POS)
 //              ------------------------------------------------------------------------------------------------------------------- //
 
 
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-///////////////////////////// NEW DEVS
-
-///////////////////////////// DEPRECIDED FUNTIONS
