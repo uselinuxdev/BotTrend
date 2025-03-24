@@ -248,7 +248,7 @@ void OnTick()
    if(rCurrent[piNumBars-1].tick_volume<5)
    { 
       // Poner SL G1
-      if(SetStopLostG0()<0) return;
+      if(SetStopLostG1()<0) return;
       // Contar ops.
       if(countbot()<0) return;
       // Actualiza panel 
@@ -610,7 +610,7 @@ short SetZeroLevelThread(int iThread)
    int copied=CopyRates(Symbol(),PERIOD_M5,0,iPeriodos,rLastBars);
    if(copied<iPeriodos)
    {
-      vtext="GetLevels: No se ha podido cargar las barras de las Ãºltimas 24h.";
+      vtext="GetLevels: No se ha podido cargar las barras de las últimas 24h.";
       ENUMTXT = PRINT;
       expertLog(); 
       return -1;
@@ -1104,7 +1104,7 @@ short CheckThreadProfit(int ithread)
          dhandicap+=getComisionPos();
          dhandicap+=dOpadd;
          if(bSumSwapExistProfit) dhandicap+=cPos.Swap();
-         //dhandicap+=cPos.Swap();  // Aparece el el profit directamente no contar 2 veces.
+         //dhandicap+=cPos.Swap(); 
          // Control por ops abiertas
          dcurrentvalue=cPos.Profit();
       }        
@@ -1167,7 +1167,7 @@ short CloseThisThread(int ithread)
 }
 
 // Pondrá SL en las operaciones G0.Después de evaluar los límites diarios. Si hay diferencia de lote de hilo
-short SetStopLostG0()
+short SetStopLostG1()
 {
    ulong sZgravityStep;
    double diff=0;
@@ -1256,8 +1256,8 @@ short SetStopLostThread(int iThread, ulong sZgravityStep)
          // Control de SL
          dOpen=cPos.PriceOpen();
          dCurrent=cPos.PriceCurrent();
-         // Sólo poner SL en operaciones G0
-         if(lstep<(sZgravityStep)) continue;
+         // Sólo poner SL en operaciones G1
+         if(lstep<(sZgravityStep+1)) continue;
          // Control de hilo en esa dir.
          if(TYPE_POS==POSITION_TYPE_SELL)
          {
@@ -2006,7 +2006,7 @@ short EqualZero()
    {
       // Llamada hilos 
       dThreadLot=dLOTBear[i]+dLOTBULL[i];
-      if(dThreadLot>(dLot*3))
+      if(dThreadLot>(dLot*4))
       {
          EqualZeroThread(i,sZgravityStep);
       }  
@@ -2177,7 +2177,7 @@ short BreakZeroThread(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE TYPE_PO
             // Control de operación killed para tener el doble de lo de antes
             if(dLOTBULL[iThread]<=0) 
             {
-               //Valor de operación seleccionada
+               //Valor operación cargada
                dLOTBULL[iThread]=cPos.Volume();
             }
             dNewLot=((dLOTBULL[iThread]*2)-dLOTBear[iThread]);
@@ -2193,7 +2193,7 @@ short BreakZeroThread(int iThread,ulong sZgravityStep,ENUM_POSITION_TYPE TYPE_PO
             // Control de operación killed para tener el doble de lo de antes
             if(dLOTBear[iThread]<=0) 
             {
-               //Valor de operación seleccionada
+               //Valor contrario
                dLOTBear[iThread]=cPos.Volume();
             }
             dNewLot=((dLOTBear[iThread]*2)-dLOTBULL[iThread]);
@@ -2438,6 +2438,7 @@ bool HLineCheckMoved()
    //--- successful execution
    return(true);
 }
+
 bool HLineCheckMovedThread(int iThread)
 {
    long chart_ID=0;
