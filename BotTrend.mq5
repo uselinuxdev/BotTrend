@@ -1998,15 +1998,15 @@ double GetSLMax()
 short EqualZero()
 {
    ulong sZgravityStep;
-   double dLot,diff;
+   double dLot,dThreadLot;
    // Coger el parÃÂ¡metro que ha seleccionado el usuario
    dLot=Lots*iCent;
    sZgravityStep=GetGravityStep();   
    for(int i=0;i<9;i++)
    {
       // Llamada hilos 
-      diff=MathAbs(dLOTBear[i]-dLOTBULL[i]);
-      if(diff>(0))
+      dThreadLot=dLOTBear[i]+dLOTBULL[i];
+      if(dThreadLot>(dLot*3))
       {
          EqualZeroThread(i,sZgravityStep);
       }  
@@ -2432,13 +2432,12 @@ bool HLineCheckMoved()
       diff=MathAbs(dLOTBear[i]+dLOTBULL[i]);
       if(diff>(0))
       {
-         HLineCheckMovedThread(i);
+         if(HLineCheckMovedThread(i)==false) return false;
       }  
    }
    //--- successful execution
    return(true);
 }
-
 bool HLineCheckMovedThread(int iThread)
 {
    long chart_ID=0;
