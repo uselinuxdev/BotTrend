@@ -3,11 +3,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 - El bot sufre cuando la G0 se crea. Mucho GAP entre G-1 y G0. <-- OK
 	- Intentar crear G0 en el limite del hilo + 2Franciscas.
-- Borrar SL/TP al crear G0. Dejar al usuario ponerlas más adelante.
-- Niveles Zona Cero:
-	- Crear nueva operación Zero a 3TP de soporte/resistencia.
-	- Break a 2Franciscas superando soporte / resistencia.
-- No poner SL.
+- No poner SL. <-- OK
+- Borrar SL/TP al crear G0. Dejar al usuario ponerlas más adelante. Sólo G-1>=.
+- A partir de primera G0.:
+	- 1 Break semana. A partir de la semana esperar a que supere los límites.
+	- Si se va al otro límite sólo iguala lote.
+
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
