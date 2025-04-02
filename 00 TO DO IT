@@ -5,9 +5,7 @@
 	- Intentar crear G0 en el limite del hilo + 2Franciscas.
 - No poner SL. <-- OK
 - Borrar SL/TP al crear G0. Dejar al usuario ponerlas más adelante. Sólo G-1>=.
-- A partir de primera G0.:
-	- 1 Break semana. A partir de la semana esperar a que supere los límites.
-	- Si se va al otro límite sólo iguala lote.
+- SL de operaciones. Volver a poner. Subir limite al máximo de las últimas 24h.
 
 
 
